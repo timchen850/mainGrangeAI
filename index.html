@@ -8316,10 +8316,21 @@ async function generate() {
 // The function sends { error: "<message>" } (a string), e.g. the monthly-limit notice.
 function genErrorText(status, body) {
   const msg = typeof body?.error === 'string' ? body.error : (body?.error?.message || '');
+  // The live function (v6) counts every AI call against a daily limit and says "10 proposals/day",
+  // but one draft makes up to 3 calls. Say when drafting reopens instead: its count resets at
+  // midnight UTC, shown in the user's own time.
+  if (status === 429 && /daily limit/i.test(msg)) return 'You’ve reached today’s drafting limit. You can draft again ' + genDailyResetText() + '.';
   if (status === 429) return msg || 'You’ve used this month’s drafts on your plan. See Pricing to draft more.';
   if (status === 401) return 'Your session expired. Sign in again to keep drafting.';
   if (status >= 500) return 'The AI writer is unavailable right now. Please try again in a minute.';
   return msg || 'Couldn’t write the draft (error ' + status + '). Please try again.';
+}
+
+function genDailyResetText(now) {
+  now = now || new Date();
+  const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const time = reset.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return 'after ' + time + (reset.toDateString() === now.toDateString() ? ' today' : ' tomorrow');
 }
 
 function showAIPolicyBanner(grant) {

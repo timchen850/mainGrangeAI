@@ -225,6 +225,22 @@ flow('draft-limit-message', async (browser, check) => {
   return t;
 });
 
+// The live generate-proposal (v6, Oct 2026) answers with a daily limit that counts each AI call.
+flow('draft-daily-limit-message', async (browser, check) => {
+  const LIMIT = 'Daily limit reached (10 proposals/day). Try again tomorrow.';
+  const t = await openApp(browser, { persona: 'np', timezoneId: 'America/New_York', fnOverride: { 'generate-proposal': { status: 429, body: { error: LIMIT } } } });
+  const p = t.page; const toasts = await toastSpy(p);
+  await p.clock.setFixedTime(new Date('2026-10-25T18:00:00Z'));   // 2:00 p.m. in New York
+  await p.evaluate(() => go('generator')); await p.waitForTimeout(800);
+  await p.evaluate(() => { const s = (window._genPipeline || [])[0]; if (s) pickSaved(s.id); }); await p.waitForTimeout(800);
+  await fillGenForm(p); await p.click('#gen-btn'); await p.waitForTimeout(2500);
+  check('says when drafting reopens, in local time ("after 8:00 PM today")', toasts.some((m) => /today’s drafting limit\. You can draft again after 8:00 PM today\./.test(m)) && !toasts.some((m) => /10 proposals/.test(m)));
+  const later = await p.evaluate(() => [genDailyResetText(new Date('2026-10-26T01:30:00Z')), genDailyResetText(new Date('2026-10-25T23:59:00Z'))]);
+  check('after 8 p.m. it says tomorrow; just before, today', later[0] === 'after 8:00 PM tomorrow' && later[1] === 'after 8:00 PM today');
+  t.errors = t.errors.filter((e) => !/429|Too Many/.test(e));
+  return t;
+});
+
 flow('save-failures-are-visible', async (browser, check) => {
   const t = await openApp(browser, { persona: 'np', failTables: ['readiness_items'] });
   const p = t.page;
