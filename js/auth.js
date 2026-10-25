@@ -1,83 +1,72 @@
-// true when the form is in "sign up" mode, false for "log in"
-var isSignUp = false;
+let signingUp = false;
 
-// Switch between log in and sign up
 function toggleSignUp() {
-  isSignUp = !isSignUp;
-
-  if (isSignUp) {
-    document.getElementById('login-title').textContent = 'Create an account';
-    document.getElementById('switch-link').textContent = 'Already have an account? Log in';
-  } else {
-    document.getElementById('login-title').textContent = 'Log in';
-    document.getElementById('switch-link').textContent = "Don't have an account? Sign up";
-  }
+  signingUp = !signingUp;
+  document.getElementById('login-title').textContent = signingUp ? 'Create an account' : 'Log in';
+  document.getElementById('switch-link').textContent = signingUp
+    ? 'Already have an account? Log in'
+    : "Don't have an account? Sign up";
 }
 
 async function handleLogin() {
-  var email = document.getElementById('email').value;
-  var password = document.getElementById('password').value;
-  var errorText = document.getElementById('login-error');
+  const email = document.getElementById('email').value.trim();
+  const pw = document.getElementById('password').value;
+  const err = document.getElementById('login-error');
 
-  // Make sure both boxes are filled in
-  if (email == '' || password == '') {
-    errorText.textContent = 'Please enter your email and password.';
+  if (!email || !pw) {
+    err.textContent = 'Please enter your email and password.';
+    return;
+  }
+  if (signingUp && pw.length < 6) {
+    err.textContent = 'Password needs to be at least 6 characters.';
     return;
   }
 
-  if (password.length < 6) {
-    errorText.textContent = 'Password must be at least 6 characters.';
+  const res = signingUp
+    ? await db.auth.signUp({ email, password: pw })
+    : await db.auth.signInWithPassword({ email, password: pw });
+
+  if (res.error) {
+    err.textContent = res.error.message;
     return;
   }
 
-  var result;
-  if (isSignUp) {
-    result = await supabase.auth.signUp({ email: email, password: password });
-  } else {
-    result = await supabase.auth.signInWithPassword({ email: email, password: password });
-  }
-
-  if (result.error) {
-    errorText.textContent = result.error.message;
+  // signUp with email confirmation on gives back no session
+  if (!res.data.session) {
+    err.textContent = 'Check your email to confirm your account.';
     return;
   }
 
-  errorText.textContent = '';
-  currentUser = result.data.user;
+  err.textContent = '';
+  user = res.data.user;
   await afterLogin();
 }
 
 async function logInWithGoogle() {
-  await supabase.auth.signInWithOAuth({
+  await db.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.origin }
   });
 }
 
-// Runs after the user logs in
 async function afterLogin() {
   document.getElementById('navbar').classList.remove('hidden');
 
-  // Get their survey answers from the database
-  var result = await supabase
-    .from('onboarding_answers')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .single();
+  const { data } = await db.from('onboarding_answers').select('answers').eq('user_id', user.id).maybeSingle();
 
-  if (result.data) {
-    answers = result.data.answers;
+  if (data && data.answers) {
+    answers = data.answers;
     showScreen('dashboard');
   } else {
-    // New user, send them to the survey
     startOnboarding();
   }
 }
 
 async function logOut() {
-  await supabase.auth.signOut();
-  currentUser = null;
+  await db.auth.signOut();
+  user = null;
   answers = {};
+  allGrants = [];
   document.getElementById('navbar').classList.add('hidden');
   showScreen('landing');
 }

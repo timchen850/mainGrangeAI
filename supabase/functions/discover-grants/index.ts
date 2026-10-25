@@ -1,48 +1,46 @@
-// Searches Grants.gov for open grants
-// (the browser can't call Grants.gov directly so we do it here)
-import { corsHeaders, sendJson } from '../_shared/helpers.ts';
+// grants.gov blocks browser requests (CORS), so the site calls this instead
+import { cors, json } from '../_shared/helpers.ts';
 
-async function searchGrantsGov(keyword: string) {
-  const response = await fetch('https://api.grants.gov/v1/api/search2', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keyword: keyword, rows: 25, oppStatuses: 'forecasted|posted' }),
-  });
-
-  if (!response.ok) return [];
-  const data = await response.json();
-  return data.data.oppHits || [];
+async function search(keyword: string) {
+  try {
+    const res = await fetch('https://api.grants.gov/v1/api/search2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, rows: 25, oppStatuses: 'forecasted|posted' }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data?.oppHits ?? [];
+  } catch {
+    return [];
+  }
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   const body = await req.json();
-  let focusAreas = body.focus_areas || [];
-  if (focusAreas.length === 0) focusAreas = ['community'];
+  const areas: string[] = body.focus_areas?.length ? body.focus_areas.slice(0, 6) : ['community'];
 
-  // Do one search for each focus area
-  const grants: any[] = [];
-  const seenIds: string[] = [];
+  const results = await Promise.all(areas.map(search));
 
-  for (const area of focusAreas) {
-    const hits = await searchGrantsGov(area);
-
-    for (const hit of hits) {
-      // skip grants we already added
-      if (seenIds.includes(hit.id)) continue;
-      seenIds.push(hit.id);
-
+  const seen = new Set();
+  const grants = [];
+  results.forEach((hits, i) => {
+    for (const h of hits) {
+      if (seen.has(h.id)) continue;
+      seen.add(h.id);
       grants.push({
-        id: hit.id,
-        title: hit.title,
-        agency: hit.agency,
-        close_date: hit.closeDate,
-        status: hit.oppStatus,
-        description: area,
+        id: h.id,
+        title: h.title,
+        agency: h.agency,
+        close_date: h.closeDate || null,
+        status: h.oppStatus,
+        description: areas[i],
       });
     }
-  }
+  });
 
-  return sendJson({ grants: grants });
+  return json({ grants });
 });

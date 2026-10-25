@@ -1,35 +1,28 @@
-// Checks if an EIN belongs to a real 501(c)(3)
-// Uses the free ProPublica Nonprofit Explorer API
-import { corsHeaders, sendJson, getUser } from '../_shared/helpers.ts';
+import { cors, json, getUser } from '../_shared/helpers.ts';
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   const user = await getUser(req);
-  if (!user) return sendJson({ error: 'Please log in' }, 401);
+  if (!user) return json({ error: 'Please log in' }, 401);
 
-  const body = await req.json();
-  const ein = String(body.ein || '').replace(/\D/g, '');
+  const { ein } = await req.json();
+  const digits = String(ein ?? '').replace(/\D/g, '');
+  if (digits.length !== 9) return json({ error: 'EIN must be 9 digits' }, 400);
 
-  if (ein.length !== 9) {
-    return sendJson({ error: 'EIN must be 9 digits' }, 400);
-  }
+  const res = await fetch(`https://projects.propublica.org/nonprofits/api/v2/organizations/${digits}.json`);
+  if (res.status === 404) return json({ found: false });
+  if (!res.ok) return json({ error: 'Lookup failed' }, 502);
 
-  const response = await fetch('https://projects.propublica.org/nonprofits/api/v2/organizations/' + ein + '.json');
+  const { organization: org } = await res.json();
+  const code = org.subsection_code;
 
-  if (response.status === 404) {
-    return sendJson({ found: false });
-  }
-
-  const data = await response.json();
-  const org = data.organization;
-
-  return sendJson({
+  return json({
     found: true,
     name: org.name,
     city: org.city,
     state: org.state,
-    is_501c3: org.subsection_code === 3,
-    status: org.subsection_code === 3 ? '501(c)(3) charity' : '501(c)(' + org.subsection_code + ')',
+    is_501c3: code === 3,
+    status: `501(c)(${code})`,
   });
 });

@@ -1,75 +1,65 @@
-// Connect to Supabase (our database and login service)
-var supabase = window.supabase.createClient(
-  window.SUPABASE_CONFIG.url,
-  window.SUPABASE_CONFIG.anonKey
-);
+const db = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 
-// The logged in user and their survey answers
-var currentUser = null;
-var answers = {};
+let user = null;
+let answers = {};
 
-// List of every screen on the page
-var screens = [
-  'landing', 'login', 'onboarding', 'dashboard', 'discover',
-  'readiness', 'generator', 'deadlines', 'chat', 'profile'
-];
+const screens = ['landing', 'login', 'onboarding', 'dashboard', 'discover',
+  'readiness', 'generator', 'deadlines', 'chat', 'profile'];
 
-// Hide all screens and show just one
 function showScreen(name) {
-  for (var i = 0; i < screens.length; i++) {
-    document.getElementById(screens[i]).classList.add('hidden');
-  }
+  screens.forEach(s => document.getElementById(s).classList.add('hidden'));
   document.getElementById(name).classList.remove('hidden');
+  window.scrollTo(0, 0);
 
-  // Load the data for the screen we just opened
   if (name == 'dashboard') loadDashboard();
-  if (name == 'discover') loadGrants();
+  if (name == 'discover' && allGrants.length == 0) loadGrants();
   if (name == 'readiness') loadReadiness();
   if (name == 'deadlines') loadDeadlines();
   if (name == 'profile') loadProfile();
 }
 
-// Show a small message in the corner for 3 seconds
-function showToast(message) {
-  var toast = document.getElementById('toast');
-  toast.textContent = message;
-  toast.classList.remove('hidden');
-  setTimeout(function () {
-    toast.classList.add('hidden');
-  }, 3000);
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(el.timer);
+  el.timer = setTimeout(() => el.classList.add('hidden'), 3000);
 }
 
-// Call one of our Supabase edge functions
-async function callFunction(name, body) {
-  var result = await supabase.functions.invoke(name, { body: body });
-  if (result.error) {
-    console.log('Error calling ' + name, result.error);
+async function callFn(name, body) {
+  const { data, error } = await db.functions.invoke(name, { body });
+  if (error) {
+    console.log(name, error);
     return null;
   }
-  return result.data;
+  return data;
 }
 
-// Turn a date into how many days away it is
-function daysUntil(dateString) {
-  var today = new Date();
-  var due = new Date(dateString);
-  var diff = due - today;
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+// "2026-05-01" gets read as UTC and shows up a day early, so add a time
+function toDate(str) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) str += 'T00:00:00';
+  return new Date(str);
 }
 
-// Format a number like 50000 into $50,000
-function formatMoney(num) {
-  if (!num) return 'Not listed';
-  return '$' + Number(num).toLocaleString();
+function daysUntil(str) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((toDate(str) - today) / 86400000);
 }
 
-// When the page loads, check if someone is already logged in
-window.onload = async function () {
-  var result = await supabase.auth.getSession();
-  var session = result.data.session;
+function money(n) {
+  if (!n || isNaN(n)) return 'Not listed';
+  return '$' + Number(n).toLocaleString();
+}
 
-  if (session) {
-    currentUser = session.user;
+function esc(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+window.onload = async () => {
+  const { data } = await db.auth.getSession();
+  if (data.session) {
+    user = data.session.user;
     await afterLogin();
   } else {
     showScreen('landing');

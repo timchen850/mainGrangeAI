@@ -1,46 +1,38 @@
-// Finds past federal grants given to similar organizations
-import { corsHeaders, sendJson } from '../_shared/helpers.ts';
+import { cors, json } from '../_shared/helpers.ts';
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
-  const body = await req.json();
-  const keywords = body.keywords || [];
-  if (keywords.length === 0) return sendJson({ results: [] });
+  const { keywords = [], location = '' } = await req.json();
+  if (keywords.length === 0) return json({ results: [] });
 
-  const filters: any = {
+  const filters: Record<string, unknown> = {
     award_type_codes: ['02', '03', '04', '05'],
-    keywords: keywords,
+    keywords,
     time_period: [{ start_date: '2022-01-01', end_date: new Date().toISOString().slice(0, 10) }],
   };
 
-  // if we know their state, only show awards there
-  const stateMatch = (body.location || '').match(/\b([A-Z]{2})\b/);
-  if (stateMatch) {
-    filters.recipient_locations = [{ country: 'USA', state: stateMatch[1] }];
-  }
+  // pull "TX" out of "Austin, TX"
+  const state = location.match(/\b([A-Z]{2})\b/);
+  if (state) filters.recipient_locations = [{ country: 'USA', state: state[1] }];
 
-  const response = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
+  const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      filters: filters,
+      filters,
       fields: ['Recipient Name', 'Award Amount', 'Awarding Agency'],
       limit: 10,
     }),
   });
+  if (!res.ok) return json({ results: [] });
 
-  if (!response.ok) return sendJson({ results: [] });
-  const data = await response.json();
+  const data = await res.json();
+  const results = data.results.map((r: Record<string, unknown>) => ({
+    recipient: r['Recipient Name'],
+    amount: r['Award Amount'],
+    agency: r['Awarding Agency'],
+  }));
 
-  const results = [];
-  for (const row of data.results) {
-    results.push({
-      recipient: row['Recipient Name'],
-      amount: row['Award Amount'],
-      agency: row['Awarding Agency'],
-    });
-  }
-
-  return sendJson({ results: results });
+  return json({ results });
 });

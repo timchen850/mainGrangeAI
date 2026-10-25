@@ -20,8 +20,6 @@ Live site: https://grangeai.net
 - `supabase/` is the backend
   - `schema.sql` has the database tables
   - `functions/` has the edge functions that call Grants.gov, the IRS data, USASpending.gov, Stripe and the AI
-- `app/` is the desktop app (React + Electron)
-- `mobile/` is the phone app (React + Capacitor)
 
 ## Running it
 
@@ -33,25 +31,9 @@ python3 -m http.server 3456
 
 Then open http://localhost:3456
 
-Desktop app:
-
-```
-cd app
-npm install
-npm run dev
-```
-
-Phone app:
-
-```
-cd mobile
-npm install
-npm run dev
-```
-
 ## Setup
 
 1. Make a Supabase project and run `supabase/schema.sql` in the SQL editor.
 2. Copy `config.example.js` to `config.js` and fill in your Supabase URL and key.
-3. Add these secrets to Supabase: `GEMINI_API_KEY`, `GROQ_API_KEY`, `STRIPE_SECRET_KEY`.
+3. Add these secrets to Supabase: `GEMINI_API_KEY`, `GROQ_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and the four `PRICE_...` ids from Stripe.
 4. Deploy the functions with `supabase functions deploy`.

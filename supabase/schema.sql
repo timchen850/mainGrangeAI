@@ -1,7 +1,4 @@
--- Database tables for Grange AI
--- Run this in the Supabase SQL editor
 
--- One row per user
 create table profiles (
   id uuid primary key references auth.users(id),
   org_name text,
@@ -12,14 +9,13 @@ create table profiles (
   created_at timestamp default now()
 );
 
--- Answers from the onboarding survey
+-- survey answers, stored as one json blob
 create table onboarding_answers (
   user_id uuid primary key references auth.users(id),
   answers jsonb,
   updated_at timestamp default now()
 );
 
--- Grants the user saved
 create table grants (
   id serial primary key,
   user_id uuid references auth.users(id),
@@ -32,7 +28,6 @@ create table grants (
   created_at timestamp default now()
 );
 
--- Proposal drafts
 create table proposals (
   id serial primary key,
   user_id uuid references auth.users(id),
@@ -41,7 +36,6 @@ create table proposals (
   created_at timestamp default now()
 );
 
--- Deadlines and reminders
 create table deadlines (
   id serial primary key,
   user_id uuid references auth.users(id),
@@ -50,7 +44,7 @@ create table deadlines (
   done boolean default false
 );
 
--- How many proposals each user made each day (for the daily limit)
+-- daily draft limit
 create table proposal_usage (
   user_id uuid references auth.users(id),
   day date default current_date,
@@ -58,7 +52,7 @@ create table proposal_usage (
   primary key (user_id, day)
 );
 
--- Pieces of past proposals, used to match the user's writing style
+-- past proposals split into chunks for style matching (384 = gte-small)
 create extension if not exists vector;
 
 create table document_chunks (
@@ -69,7 +63,6 @@ create table document_chunks (
   embedding vector(384)
 );
 
--- Find the chunks closest to a search
 create or replace function match_document_chunks(query_embedding vector(384), match_count int)
 returns table (id int, content text, similarity float)
 language sql
@@ -81,7 +74,7 @@ as $$
   limit match_count;
 $$;
 
--- Row level security: users can only see their own rows
+-- everyone can only see their own rows
 alter table profiles enable row level security;
 alter table onboarding_answers enable row level security;
 alter table grants enable row level security;

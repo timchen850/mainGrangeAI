@@ -10,7 +10,6 @@
 </head>
 <body>
 
-  <!-- Top navigation bar (only shows after logging in) -->
   <nav id="navbar" class="hidden">
     <div class="logo">
       <img src="logo.png" alt="logo">
@@ -28,7 +27,6 @@
     </div>
   </nav>
 
-  <!-- ===== Landing page ===== -->
   <section id="landing" class="screen">
     <div class="hero">
       <img src="logo.png" alt="Grange AI logo" class="hero-logo">
@@ -84,7 +82,6 @@
     </footer>
   </section>
 
-  <!-- ===== Login / Sign up ===== -->
   <section id="login" class="screen hidden">
     <div class="form-box">
       <h2 id="login-title">Log in</h2>
@@ -99,7 +96,6 @@
     </div>
   </section>
 
-  <!-- ===== Onboarding survey ===== -->
   <section id="onboarding" class="screen hidden">
     <div class="form-box wide">
       <div class="progress"><div id="progress-fill"></div></div>
@@ -114,7 +110,6 @@
     </div>
   </section>
 
-  <!-- ===== Dashboard ===== -->
   <section id="dashboard" class="screen hidden">
     <h1 id="greeting">Welcome!</h1>
     <div class="stats">
@@ -129,7 +124,6 @@
     <ul id="dash-deadlines"></ul>
   </section>
 
-  <!-- ===== Find grants ===== -->
   <section id="discover" class="screen hidden">
     <h1>Find Grants</h1>
     <div class="row">
@@ -148,7 +142,6 @@
     <div id="past-awards"></div>
   </section>
 
-  <!-- ===== Readiness checklist ===== -->
   <section id="readiness" class="screen hidden">
     <h1>Are you ready to apply?</h1>
     <div class="progress"><div id="ready-fill"></div></div>
@@ -169,7 +162,6 @@
     <a href="https://sam.gov" target="_blank">Go to SAM.gov</a>
   </section>
 
-  <!-- ===== Proposal generator ===== -->
   <section id="generator" class="screen hidden">
     <h1>Write a Proposal</h1>
     <label>Grant name</label>
@@ -196,7 +188,6 @@
     </div>
   </section>
 
-  <!-- ===== Deadlines ===== -->
   <section id="deadlines" class="screen hidden">
     <h1>Deadlines</h1>
     <div class="row">
@@ -208,7 +199,6 @@
     <button class="btn-outline" onclick="downloadCalendar()">Add to my calendar (.ics)</button>
   </section>
 
-  <!-- ===== AI assistant chat ===== -->
   <section id="chat" class="screen hidden">
     <h1>Grant Assistant</h1>
     <p class="small">Ask anything about grants or your applications.</p>
@@ -219,7 +209,6 @@
     </div>
   </section>
 
-  <!-- ===== Profile ===== -->
   <section id="profile" class="screen hidden">
     <h1>Your Profile</h1>
     <div id="profile-info"></div>
@@ -232,7 +221,6 @@
     <p id="past-status" class="small"></p>
   </section>
 
-  <!-- Little popup message -->
   <div id="toast" class="hidden"></div>
 
   <script src="config.js"></script>

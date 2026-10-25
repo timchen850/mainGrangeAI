@@ -1,163 +1,131 @@
-// All grants we found, before filtering
-var allGrants = [];
+let allGrants = [];
+let shown = [];
 
 async function loadGrants() {
-  document.getElementById('grant-status').textContent = 'Searching Grants.gov...';
+  const status = document.getElementById('grant-status');
+  status.textContent = 'Searching Grants.gov...';
 
-  // Our edge function talks to Grants.gov for us
-  var data = await callFunction('discover-grants', {
+  const data = await callFn('discover-grants', {
     focus_areas: answers.focus_areas || [],
     mission: answers.mission || ''
   });
 
   if (!data || !data.grants) {
-    document.getElementById('grant-status').textContent = 'Could not load grants right now.';
+    status.textContent = "Couldn't load grants right now. Try Refresh in a minute.";
     return;
   }
 
-  allGrants = [];
-  for (var i = 0; i < data.grants.length; i++) {
-    var grant = data.grants[i];
-    grant.score = calcMatchScore(grant);
-    allGrants.push(grant);
-  }
-
-  document.getElementById('grant-status').textContent = 'Found ' + allGrants.length + ' grants.';
+  allGrants = data.grants.map(g => ({ ...g, score: matchScore(g) }));
+  status.textContent = `Found ${allGrants.length} grants.`;
   filterGrants();
   loadPastAwards();
 }
 
-// Give each grant a score from 0 to 99 based on how well it fits
-function calcMatchScore(grant) {
-  var score = 35;
-  var text = (grant.title + ' ' + (grant.description || '')).toLowerCase();
+function matchScore(g) {
+  let score = 35;
+  const text = (g.title + ' ' + (g.description || '')).toLowerCase();
 
-  // Points for each focus area that shows up in the grant
-  var focusAreas = answers.focus_areas || [];
-  for (var i = 0; i < focusAreas.length; i++) {
-    if (text.includes(focusAreas[i].toLowerCase())) {
-      score += 14;
-    }
-  }
-
-  // A few points for words from the mission
-  var missionWords = (answers.mission || '').toLowerCase().split(' ');
-  var wordPoints = 0;
-  for (var i = 0; i < missionWords.length; i++) {
-    if (missionWords[i].length > 4 && text.includes(missionWords[i])) {
-      wordPoints += 2;
-    }
-  }
-  if (wordPoints > 12) wordPoints = 12;
-  score += wordPoints;
-
-  // Lose points if it needs 501(c)(3) and the user isn't one
-  if (text.includes('501(c)(3)') && answers.entity_type != '501(c)(3) nonprofit') {
-    score -= 20;
-  }
-
-  if (score > 99) score = 99;
-  if (score < 0) score = 0;
-  return score;
-}
-
-// Search and sort the list, then draw it
-function filterGrants() {
-  var search = document.getElementById('search-box').value.toLowerCase();
-  var sortBy = document.getElementById('sort-select').value;
-
-  var shown = [];
-  for (var i = 0; i < allGrants.length; i++) {
-    if (allGrants[i].title.toLowerCase().includes(search)) {
-      shown.push(allGrants[i]);
-    }
-  }
-
-  if (sortBy == 'score') {
-    shown.sort(function (a, b) { return b.score - a.score; });
-  } else {
-    shown.sort(function (a, b) { return new Date(a.close_date) - new Date(b.close_date); });
-  }
-
-  drawGrants(shown);
-}
-
-function drawGrants(list) {
-  var html = '';
-  for (var i = 0; i < list.length; i++) {
-    var g = list[i];
-    var color = 'low';
-    if (g.score >= 70) color = 'high';
-    else if (g.score >= 45) color = 'mid';
-
-    html += '<div class="grant">';
-    html += '<span class="score ' + color + '">' + g.score + '% match</span>';
-    html += '<h3>' + g.title + '</h3>';
-    html += '<p class="small">' + g.agency + ' | Closes: ' + (g.close_date || 'Not listed') + '</p>';
-    html += '<p>Award: ' + formatMoney(g.award_ceiling) + '</p>';
-    html += '<button class="btn-outline" onclick="saveGrant(' + i + ')">Save</button> ';
-    html += '<button class="btn-outline" onclick="draftForGrant(' + i + ')">Write proposal</button> ';
-    html += '<a href="https://www.grants.gov/search-results-detail/' + g.id + '" target="_blank">View on Grants.gov</a>';
-    html += '</div>';
-  }
-  if (html == '') html = '<p>No grants match your search.</p>';
-  document.getElementById('grant-list').innerHTML = html;
-
-  // remember which list is on screen so the buttons know which grant
-  window.shownGrants = list;
-}
-
-async function saveGrant(index) {
-  var g = window.shownGrants[index];
-
-  await supabase.from('grants').insert({
-    user_id: currentUser.id,
-    title: g.title,
-    funder: g.agency,
-    amount: g.award_ceiling,
-    deadline: g.close_date,
-    match_score: g.score
+  (answers.focus_areas || []).forEach(area => {
+    if (text.includes(area.toLowerCase())) score += 14;
   });
 
-  // Add the deadline too so it shows up on the deadlines page
-  if (g.close_date) {
-    await supabase.from('deadlines').insert({
-      user_id: currentUser.id,
-      title: g.title,
-      due_date: g.close_date,
-      done: false
+  let bonus = 0;
+  (answers.mission || '').toLowerCase().split(/\W+/).forEach(w => {
+    if (w.length > 4 && text.includes(w)) bonus += 2;
+  });
+  score += Math.min(bonus, 12);
+
+  if (text.includes('501(c)(3)') && answers.entity_type != '501(c)(3) nonprofit') score -= 20;
+
+  return Math.max(0, Math.min(99, score));
+}
+
+function filterGrants() {
+  const q = document.getElementById('search-box').value.toLowerCase().trim();
+  const sort = document.getElementById('sort-select').value;
+
+  shown = allGrants.filter(g => g.title.toLowerCase().includes(q));
+
+  if (sort == 'score') {
+    shown.sort((a, b) => b.score - a.score);
+  } else {
+    // forecasted grants have no close date, push them to the bottom
+    shown.sort((a, b) => {
+      if (!a.close_date) return 1;
+      if (!b.close_date) return -1;
+      return toDate(a.close_date) - toDate(b.close_date);
     });
   }
 
-  showToast('Grant saved!');
+  drawGrants();
 }
 
-// Open the generator with this grant filled in
-function draftForGrant(index) {
-  var g = window.shownGrants[index];
+function drawGrants() {
+  const html = shown.map((g, i) => {
+    const color = g.score >= 70 ? 'high' : g.score >= 45 ? 'mid' : 'low';
+    return `
+      <div class="grant">
+        <span class="score ${color}">${g.score}% match</span>
+        <h3>${esc(g.title)}</h3>
+        <p class="small">${esc(g.agency)} | Closes: ${g.close_date || 'Not listed'}</p>
+        <p>Award: ${money(g.award_ceiling)}</p>
+        <button class="btn-outline" onclick="saveGrant(${i})">Save</button>
+        <button class="btn-outline" onclick="draftFor(${i})">Write proposal</button>
+        <a href="https://www.grants.gov/search-results-detail/${g.id}" target="_blank">View on Grants.gov</a>
+      </div>`;
+  }).join('');
+
+  document.getElementById('grant-list').innerHTML = html || '<p>No grants match your search.</p>';
+}
+
+async function saveGrant(i) {
+  const g = shown[i];
+
+  const { data: dupe } = await db.from('grants').select('id').eq('user_id', user.id).eq('title', g.title).maybeSingle();
+  if (dupe) {
+    toast('Already saved.');
+    return;
+  }
+
+  await db.from('grants').insert({
+    user_id: user.id,
+    title: g.title,
+    funder: g.agency,
+    amount: g.award_ceiling || null,
+    deadline: g.close_date ? toDate(g.close_date).toISOString().slice(0, 10) : null,
+    match_score: g.score
+  });
+
+  if (g.close_date) {
+    await db.from('deadlines').insert({
+      user_id: user.id,
+      title: g.title,
+      due_date: toDate(g.close_date).toISOString().slice(0, 10)
+    });
+  }
+
+  toast('Grant saved!');
+}
+
+function draftFor(i) {
+  const g = shown[i];
   showScreen('generator');
   document.getElementById('gen-grant').value = g.title;
   document.getElementById('gen-funder').value = g.agency;
-  document.getElementById('gen-amount').value = g.award_ceiling ? formatMoney(g.award_ceiling) : '';
+  document.getElementById('gen-amount').value = g.award_ceiling ? money(g.award_ceiling) : '';
 }
 
-// Show federal awards given to similar groups in the past
 async function loadPastAwards() {
-  var data = await callFunction('usaspending-search', {
+  const data = await callFn('usaspending-search', {
     keywords: answers.focus_areas || [],
     location: answers.primary_location || ''
   });
 
-  var html = '';
-  if (data && data.results) {
-    for (var i = 0; i < data.results.length; i++) {
-      var award = data.results[i];
-      html += '<div class="grant">';
-      html += '<h3>' + award.recipient + '</h3>';
-      html += '<p>' + formatMoney(award.amount) + ' from ' + award.agency + '</p>';
-      html += '</div>';
-    }
-  }
-  if (html == '') html = '<p class="small">No past awards found.</p>';
-  document.getElementById('past-awards').innerHTML = html;
+  const html = (data && data.results || []).map(a => `
+    <div class="grant">
+      <h3>${esc(a.recipient)}</h3>
+      <p>${money(a.amount)} from ${esc(a.agency)}</p>
+    </div>`).join('');
+
+  document.getElementById('past-awards').innerHTML = html || '<p class="small">No past awards found.</p>';
 }

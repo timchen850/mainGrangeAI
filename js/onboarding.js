@@ -1,12 +1,11 @@
-// The questions in the survey, split into steps
-var steps = [
+const steps = [
   {
     title: 'Tell us about your organization',
     fields: [
       { key: 'org_name', label: 'Organization name', type: 'text', required: true },
       { key: 'entity_type', label: 'What kind of organization are you?', type: 'radio', required: true,
         options: ['501(c)(3) nonprofit', 'Other nonprofit', 'Fiscal sponsorship', 'Government / tribal', 'Not a nonprofit', 'Not sure'] },
-      { key: 'ein', label: 'EIN (tax ID number)', type: 'text' },
+      { key: 'ein', label: 'EIN', type: 'text' },
       { key: 'year_founded', label: 'Year founded', type: 'number' }
     ]
   },
@@ -24,7 +23,7 @@ var steps = [
     fields: [
       { key: 'geo_focus', label: 'Geographic focus', type: 'radio', required: true,
         options: ['Local', 'Regional', 'Statewide', 'National', 'International'] },
-      { key: 'primary_location', label: 'City and state', type: 'text', required: true },
+      { key: 'primary_location', label: 'City and state (like Austin, TX)', type: 'text', required: true },
       { key: 'people_served', label: 'People served per year', type: 'number' }
     ]
   },
@@ -39,101 +38,77 @@ var steps = [
   }
 ];
 
-var stepNumber = 0;
+let step = 0;
 
 function startOnboarding() {
-  stepNumber = 0;
+  step = 0;
   showScreen('onboarding');
   drawStep();
 }
 
-// Build the HTML for the current step
-function drawStep() {
-  var step = steps[stepNumber];
-  document.getElementById('ob-title').textContent = step.title;
-  document.getElementById('ob-step-label').textContent = 'Step ' + (stepNumber + 1) + ' of ' + steps.length;
-  document.getElementById('progress-fill').style.width = (stepNumber / steps.length * 100) + '%';
+function fieldHtml(f) {
+  const val = answers[f.key] || '';
+  let html = `<label>${f.label}${f.required ? ' *' : ''}</label>`;
 
-  var html = '';
-  for (var i = 0; i < step.fields.length; i++) {
-    var field = step.fields[i];
-    var value = answers[field.key] || '';
-    html += '<label>' + field.label + (field.required ? ' *' : '') + '</label>';
-
-    if (field.type == 'text' || field.type == 'number') {
-      html += '<input type="' + field.type + '" id="f-' + field.key + '" value="' + value + '">';
-    } else if (field.type == 'textarea') {
-      html += '<textarea id="f-' + field.key + '" rows="3">' + value + '</textarea>';
-    } else if (field.type == 'select') {
-      html += '<select id="f-' + field.key + '"><option value="">Pick one</option>';
-      for (var j = 0; j < field.options.length; j++) {
-        var selected = value == field.options[j] ? ' selected' : '';
-        html += '<option' + selected + '>' + field.options[j] + '</option>';
-      }
-      html += '</select>';
-    } else if (field.type == 'radio' || field.type == 'multi') {
-      var inputType = field.type == 'radio' ? 'radio' : 'checkbox';
-      for (var j = 0; j < field.options.length; j++) {
-        var opt = field.options[j];
-        var checked = '';
-        if (value == opt || (Array.isArray(value) && value.includes(opt))) checked = ' checked';
-        html += '<label class="option"><input type="' + inputType + '" name="f-' + field.key + '" value="' + opt + '"' + checked + '>' + opt + '</label>';
-      }
-    }
-  }
-  document.getElementById('ob-fields').innerHTML = html;
-
-  // Change the button text on the last step
-  if (stepNumber == steps.length - 1) {
-    document.getElementById('ob-next').textContent = 'Finish';
+  if (f.type == 'text' || f.type == 'number') {
+    html += `<input type="${f.type}" id="f-${f.key}" value="${esc(val)}">`;
+  } else if (f.type == 'textarea') {
+    html += `<textarea id="f-${f.key}" rows="3">${esc(val)}</textarea>`;
+  } else if (f.type == 'select') {
+    html += `<select id="f-${f.key}"><option value="">Pick one</option>`;
+    f.options.forEach(o => {
+      html += `<option ${val == o ? 'selected' : ''}>${o}</option>`;
+    });
+    html += '</select>';
   } else {
-    document.getElementById('ob-next').textContent = 'Continue';
+    const type = f.type == 'radio' ? 'radio' : 'checkbox';
+    f.options.forEach(o => {
+      const on = val == o || (Array.isArray(val) && val.includes(o));
+      html += `<label class="option"><input type="${type}" name="f-${f.key}" value="${o}" ${on ? 'checked' : ''}>${o}</label>`;
+    });
   }
+  return html;
 }
 
-// Read what the user typed into the current step
-function saveStepAnswers() {
-  var step = steps[stepNumber];
-
-  for (var i = 0; i < step.fields.length; i++) {
-    var field = step.fields[i];
-
-    if (field.type == 'radio') {
-      var picked = document.querySelector('input[name="f-' + field.key + '"]:checked');
-      answers[field.key] = picked ? picked.value : '';
-    } else if (field.type == 'multi') {
-      var boxes = document.querySelectorAll('input[name="f-' + field.key + '"]:checked');
-      var list = [];
-      for (var j = 0; j < boxes.length; j++) {
-        list.push(boxes[j].value);
-      }
-      answers[field.key] = list;
-    } else {
-      answers[field.key] = document.getElementById('f-' + field.key).value;
-    }
-  }
-}
-
-// Check that required questions are answered
-function stepIsValid() {
-  var step = steps[stepNumber];
-  for (var i = 0; i < step.fields.length; i++) {
-    var field = step.fields[i];
-    if (field.required && !answers[field.key]) {
-      document.getElementById('ob-error').textContent = 'Please answer: ' + field.label;
-      return false;
-    }
-  }
+function drawStep() {
+  const s = steps[step];
+  document.getElementById('ob-title').textContent = s.title;
+  document.getElementById('ob-step-label').textContent = `Step ${step + 1} of ${steps.length}`;
+  document.getElementById('progress-fill').style.width = (step / steps.length * 100) + '%';
+  document.getElementById('ob-fields').innerHTML = s.fields.map(fieldHtml).join('');
+  document.getElementById('ob-next').textContent = step == steps.length - 1 ? 'Finish' : 'Continue';
   document.getElementById('ob-error').textContent = '';
+}
+
+function readStep() {
+  steps[step].fields.forEach(f => {
+    if (f.type == 'radio') {
+      const picked = document.querySelector(`input[name="f-${f.key}"]:checked`);
+      answers[f.key] = picked ? picked.value : '';
+    } else if (f.type == 'multi') {
+      const boxes = document.querySelectorAll(`input[name="f-${f.key}"]:checked`);
+      answers[f.key] = [...boxes].map(b => b.value);
+    } else {
+      answers[f.key] = document.getElementById('f-' + f.key).value.trim();
+    }
+  });
+}
+
+function stepOk() {
+  const missing = steps[step].fields.find(f => f.required && !answers[f.key]);
+  if (missing) {
+    document.getElementById('ob-error').textContent = 'Please answer: ' + missing.label;
+    return false;
+  }
   return true;
 }
 
 async function nextStep() {
-  saveStepAnswers();
-  if (!stepIsValid()) return;
+  readStep();
+  if (!stepOk()) return;
 
-  if (stepNumber < steps.length - 1) {
-    stepNumber++;
+  if (step < steps.length - 1) {
+    step++;
     drawStep();
   } else {
     await finishOnboarding();
@@ -141,33 +116,33 @@ async function nextStep() {
 }
 
 function prevStep() {
-  saveStepAnswers();
-  if (stepNumber > 0) {
-    stepNumber--;
+  readStep();
+  if (step > 0) {
+    step--;
     drawStep();
   }
 }
 
-// Save all the answers to the database
 async function finishOnboarding() {
-  var result = await supabase.from('onboarding_answers').upsert({
-    user_id: currentUser.id,
-    answers: answers
-  });
+  const btn = document.getElementById('ob-next');
+  btn.disabled = true;
 
-  if (result.error) {
-    document.getElementById('ob-error').textContent = 'Could not save. Try again.';
+  const { error } = await db.from('onboarding_answers').upsert({ user_id: user.id, answers });
+
+  if (error) {
+    btn.disabled = false;
+    document.getElementById('ob-error').textContent = "Couldn't save, try again.";
     return;
   }
 
-  // Also save the org name on the profile
-  await supabase.from('profiles').upsert({
-    id: currentUser.id,
+  await db.from('profiles').upsert({
+    id: user.id,
     org_name: answers.org_name,
     org_type: answers.entity_type,
     ein: answers.ein
   });
 
-  showToast('Profile saved!');
+  btn.disabled = false;
+  toast('Profile saved!');
   showScreen('dashboard');
 }

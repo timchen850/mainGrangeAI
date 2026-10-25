@@ -1,29 +1,34 @@
-// Stripe calls this after someone pays or cancels
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendJson } from '../_shared/helpers.ts';
+import Stripe from 'https://esm.sh/stripe@14?target=deno';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!);
+
+// service role key so we can update any user's plan
+const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
 Deno.serve(async (req) => {
-  const event = await req.json();
+  const body = await req.text();
+  const sig = req.headers.get('stripe-signature') ?? '';
 
-  // Use the service key so we can update any user's plan
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  let event;
+  try {
+    event = await stripe.webhooks.constructEventAsync(body, sig, Deno.env.get('STRIPE_WEBHOOK_SECRET')!);
+  } catch (e) {
+    console.log('bad signature', e);
+    return new Response('bad signature', { status: 400 });
+  }
 
-  const thing = event.data.object;
+  const obj = event.data.object as Record<string, any>;
 
   if (event.type === 'checkout.session.completed') {
-    const userId = thing.metadata.user_id;
-    const plan = thing.metadata.plan;
-    await supabase.from('profiles').update({ plan: plan, stripe_customer_id: thing.customer }).eq('id', userId);
-    console.log('User ' + userId + ' bought ' + plan);
+    await db.from('profiles')
+      .update({ plan: obj.metadata.plan, stripe_customer_id: obj.customer })
+      .eq('id', obj.metadata.user_id);
   }
 
   if (event.type === 'customer.subscription.deleted') {
-    await supabase.from('profiles').update({ plan: 'free' }).eq('stripe_customer_id', thing.customer);
-    console.log('Subscription cancelled for ' + thing.customer);
+    await db.from('profiles').update({ plan: 'free' }).eq('stripe_customer_id', obj.customer);
   }
 
-  return sendJson({ received: true });
+  return new Response('ok');
 });

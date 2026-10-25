@@ -1,37 +1,33 @@
-// Every message in the conversation so far
-var chatHistory = [];
+let chatLog = [];
+let waiting = false;
 
-function addMessage(text, who) {
-  var box = document.getElementById('chat-box');
-  var div = document.createElement('div');
+function addMsg(text, who) {
+  const box = document.getElementById('chat-box');
+  const div = document.createElement('div');
   div.className = 'msg ' + who;
   div.textContent = text;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+  return div;
 }
 
 async function sendChat() {
-  var input = document.getElementById('chat-input');
-  var question = input.value.trim();
-  if (question == '') return;
+  const input = document.getElementById('chat-input');
+  const q = input.value.trim();
+  if (!q || waiting) return;
 
-  addMessage(question, 'user');
-  chatHistory.push({ role: 'user', text: question });
+  addMsg(q, 'user');
+  chatLog.push({ role: 'user', text: q });
   input.value = '';
 
-  addMessage('Thinking...', 'bot');
+  waiting = true;
+  const thinking = addMsg('Thinking...', 'bot');
 
-  var data = await callFunction('ai-chat', { messages: chatHistory });
+  // only send the last few messages so the request stays small
+  const data = await callFn('ai-chat', { messages: chatLog.slice(-10) });
 
-  // remove the "Thinking..." message
-  var box = document.getElementById('chat-box');
-  box.removeChild(box.lastChild);
-
-  var reply = 'Sorry, I could not answer that right now.';
-  if (data && data.reply) {
-    reply = data.reply;
-  }
-
-  addMessage(reply, 'bot');
-  chatHistory.push({ role: 'assistant', text: reply });
+  const reply = data && data.reply ? data.reply : "Sorry, I couldn't answer that right now.";
+  thinking.textContent = reply;
+  chatLog.push({ role: 'assistant', text: reply });
+  waiting = false;
 }

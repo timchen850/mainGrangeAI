@@ -1,57 +1,41 @@
-var myDeadlines = [];
+let deadlines = [];
 
 async function loadDeadlines() {
-  var result = await supabase
-    .from('deadlines')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .order('due_date');
-
-  myDeadlines = result.data || [];
+  const { data } = await db.from('deadlines').select('*').eq('user_id', user.id).order('due_date');
+  deadlines = data || [];
   drawDeadlines();
 }
 
+function dueLabel(d) {
+  if (d.done) return 'Done';
+  const days = daysUntil(d.due_date);
+  if (days < 0) return 'Overdue!';
+  if (days == 0) return 'Due today';
+  if (days == 1) return 'Due tomorrow';
+  return days + ' days left';
+}
+
 function drawDeadlines() {
-  var html = '';
+  const html = deadlines.map(d => `
+    <li class="card">
+      <b>${esc(d.title)}</b> - ${d.due_date} (${dueLabel(d)})
+      ${d.done ? '' : `<button class="btn-outline" onclick="markDone(${d.id})">Mark done</button>`}
+      <button class="btn-outline" onclick="deleteDeadline(${d.id})">Delete</button>
+    </li>`).join('');
 
-  for (var i = 0; i < myDeadlines.length; i++) {
-    var d = myDeadlines[i];
-    var days = daysUntil(d.due_date);
-    var label = '';
-
-    if (d.done) label = 'Done';
-    else if (days < 0) label = 'Overdue!';
-    else if (days == 0) label = 'Due today';
-    else label = days + ' days left';
-
-    html += '<li class="card">';
-    html += '<b>' + d.title + '</b> - ' + d.due_date + ' (' + label + ') ';
-    if (!d.done) {
-      html += '<button class="btn-outline" onclick="markDone(' + d.id + ')">Mark done</button>';
-    }
-    html += ' <button class="btn-outline" onclick="deleteDeadline(' + d.id + ')">Delete</button>';
-    html += '</li>';
-  }
-
-  if (html == '') html = '<p>No deadlines yet. Save a grant or add one above.</p>';
-  document.getElementById('deadline-list').innerHTML = html;
+  document.getElementById('deadline-list').innerHTML = html || '<p>No deadlines yet. Save a grant or add one above.</p>';
 }
 
 async function addDeadline() {
-  var title = document.getElementById('dl-title').value;
-  var date = document.getElementById('dl-date').value;
+  const title = document.getElementById('dl-title').value.trim();
+  const date = document.getElementById('dl-date').value;
 
-  if (title == '' || date == '') {
-    showToast('Please fill in both boxes.');
+  if (!title || !date) {
+    toast('Fill in both boxes.');
     return;
   }
 
-  await supabase.from('deadlines').insert({
-    user_id: currentUser.id,
-    title: title,
-    due_date: date,
-    done: false
-  });
+  await db.from('deadlines').insert({ user_id: user.id, title, due_date: date });
 
   document.getElementById('dl-title').value = '';
   document.getElementById('dl-date').value = '';
@@ -59,35 +43,36 @@ async function addDeadline() {
 }
 
 async function markDone(id) {
-  await supabase.from('deadlines').update({ done: true }).eq('id', id);
+  await db.from('deadlines').update({ done: true }).eq('id', id);
   loadDeadlines();
 }
 
 async function deleteDeadline(id) {
   if (!confirm('Delete this deadline?')) return;
-  await supabase.from('deadlines').delete().eq('id', id);
+  await db.from('deadlines').delete().eq('id', id);
   loadDeadlines();
 }
 
-// Make a calendar file that works with Google Calendar, Outlook, etc.
 function downloadCalendar() {
-  var ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Grange AI//EN\n';
-
-  for (var i = 0; i < myDeadlines.length; i++) {
-    var d = myDeadlines[i];
-    if (d.done) continue;
-    var day = d.due_date.replace(/-/g, '');
-    ics += 'BEGIN:VEVENT\n';
-    ics += 'UID:grange-' + d.id + '\n';
-    ics += 'DTSTART;VALUE=DATE:' + day + '\n';
-    ics += 'SUMMARY:' + d.title + '\n';
-    ics += 'END:VEVENT\n';
+  const open = deadlines.filter(d => !d.done);
+  if (open.length == 0) {
+    toast('No open deadlines to export.');
+    return;
   }
-  ics += 'END:VCALENDAR';
 
-  var blob = new Blob([ics], { type: 'text/calendar' });
-  var link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'grant-deadlines.ics';
-  link.click();
+  // .ics needs \r\n line endings or Outlook won't open it
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Grange AI//EN'];
+  open.forEach(d => {
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:grange-' + d.id + '@grangeai.net');
+    lines.push('DTSTART;VALUE=DATE:' + d.due_date.replace(/-/g, ''));
+    lines.push('SUMMARY:' + d.title.replace(/,/g, '\\,'));
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/calendar' }));
+  a.download = 'grant-deadlines.ics';
+  a.click();
 }

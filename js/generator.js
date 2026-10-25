@@ -1,5 +1,4 @@
-// Sections every proposal will have
-var sections = [
+const sections = [
   'Executive Summary',
   'Statement of Need',
   'Project Description',
@@ -9,97 +8,88 @@ var sections = [
   'Organization Background'
 ];
 
-// Put together the instructions we send to the AI
+function val(id) {
+  return document.getElementById(id).value.trim();
+}
+
 function buildPrompt() {
-  var grant = document.getElementById('gen-grant').value;
-  var funder = document.getElementById('gen-funder').value;
-  var amount = document.getElementById('gen-amount').value;
-  var project = document.getElementById('gen-project').value;
-  var rfp = document.getElementById('gen-rfp').value;
+  let p = `Write a grant proposal for the "${val('gen-grant')}" grant from ${val('gen-funder') || 'the funder'}.\n`;
+  if (val('gen-amount')) p += `We are asking for ${val('gen-amount')}.\n`;
 
-  var prompt = 'Write a grant proposal for the "' + grant + '" grant from ' + funder + '.\n';
-  prompt += 'We are asking for ' + amount + '.\n\n';
-  prompt += 'About our organization:\n';
-  prompt += 'Name: ' + answers.org_name + '\n';
-  prompt += 'Type: ' + answers.entity_type + '\n';
-  prompt += 'Mission: ' + answers.mission + '\n';
-  prompt += 'Location: ' + answers.primary_location + '\n';
-  prompt += 'Who we serve: ' + answers.beneficiaries + '\n';
-  prompt += 'Budget: ' + answers.annual_budget + '\n\n';
-  prompt += 'The project: ' + project + '\n\n';
+  p += '\nAbout us:\n';
+  p += `Name: ${answers.org_name}\n`;
+  p += `Type: ${answers.entity_type}\n`;
+  p += `Mission: ${answers.mission}\n`;
+  p += `Location: ${answers.primary_location}\n`;
+  if (answers.beneficiaries) p += `Who we serve: ${answers.beneficiaries}\n`;
+  p += `Budget: ${answers.annual_budget}\n`;
 
-  if (rfp != '') {
-    prompt += 'The funder gave these instructions:\n' + rfp + '\n\n';
-  }
+  p += `\nThe project: ${val('gen-project')}\n`;
 
-  prompt += 'Use these sections: ' + sections.join(', ') + '.\n';
-  prompt += 'Write in plain language. If you are not sure about a fact, write [VERIFY: what to check].';
-  return prompt;
+  // long RFPs blow past the token limit
+  const rfp = val('gen-rfp').slice(0, 15000);
+  if (rfp) p += `\nFunder instructions:\n${rfp}\n`;
+
+  p += `\nUse these sections: ${sections.join(', ')}.\n`;
+  p += 'Write in plain language. If you are not sure about a fact, write [VERIFY: what to check].';
+  return p;
 }
 
 async function generateProposal() {
-  var button = document.getElementById('gen-btn');
+  const btn = document.getElementById('gen-btn');
+  if (btn.disabled) return;
 
-  if (document.getElementById('gen-project').value == '') {
-    showToast('Please describe the project first.');
+  if (!val('gen-project')) {
+    toast('Describe the project first.');
     return;
   }
 
-  button.disabled = true;
-  button.textContent = 'Writing... (this takes about a minute)';
+  btn.disabled = true;
+  btn.textContent = 'Writing... (about a minute)';
 
-  var data = await callFunction('generate-proposal', { prompt: buildPrompt() });
+  const data = await callFn('generate-proposal', { prompt: buildPrompt() });
 
-  button.disabled = false;
-  button.textContent = 'Write my draft';
+  btn.disabled = false;
+  btn.textContent = 'Write my draft';
 
   if (!data || !data.text) {
-    showToast('Something went wrong. Please try again.');
+    toast(data && data.error ? data.error : 'Something went wrong, try again.');
     return;
   }
 
   showDraft(data.text);
 }
 
-// Put the draft on the page and highlight the [VERIFY] parts
 function showDraft(text) {
   document.getElementById('gen-output').classList.remove('hidden');
+  document.getElementById('draft').innerHTML = esc(text)
+    .replace(/\[VERIFY:[^\]]*\]/g, m => `<span class="verify">${m}</span>`);
+}
 
-  // stop any html in the text from running
-  var safe = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  var highlighted = safe.replace(/\[VERIFY:[^\]]*\]/g, function (match) {
-    return '<span class="verify">' + match + '</span>';
-  });
-
-  document.getElementById('draft').innerHTML = highlighted;
+function draftText() {
+  return document.getElementById('draft').innerText;
 }
 
 function copyDraft() {
-  var text = document.getElementById('draft').innerText;
-  navigator.clipboard.writeText(text);
-  showToast('Copied!');
+  navigator.clipboard.writeText(draftText())
+    .then(() => toast('Copied!'))
+    .catch(() => toast('Copy failed, select the text and copy it by hand.'));
 }
 
-// Download the draft as a text file
 function downloadDraft() {
-  var text = document.getElementById('draft').innerText;
-  var blob = new Blob([text], { type: 'text/plain' });
-  var link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'proposal.txt';
-  link.click();
+  const name = (val('gen-grant') || 'proposal').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([draftText()], { type: 'text/plain' }));
+  a.download = name + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 async function saveDraft() {
-  var result = await supabase.from('proposals').insert({
-    user_id: currentUser.id,
-    grant_title: document.getElementById('gen-grant').value,
-    content: document.getElementById('draft').innerText
+  const { error } = await db.from('proposals').insert({
+    user_id: user.id,
+    grant_title: val('gen-grant'),
+    content: draftText()
   });
-
-  if (result.error) {
-    showToast('Could not save the draft.');
-  } else {
-    showToast('Draft saved!');
-  }
+  toast(error ? "Couldn't save the draft." : 'Draft saved!');
 }
