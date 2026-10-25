@@ -196,6 +196,41 @@ flow('tutorial-reduced-motion', async (browser, check) => {
   return t;
 });
 
+// The funder checks (ai-worker) and assistant (ai-chat) read focus areas, service area and budget
+// from `profiles`, but onboarding saved them only to onboarding_answers (found Oct 25).
+flow('profile-columns-backfill-and-budget', async (browser, check) => {
+  const t = await openApp(browser, { persona: 'np' });
+  const p = t.page;
+  await p.waitForTimeout(1500);
+  const row = () => t.db.profiles.find((r) => r.user_id === UID.np);
+  check('sign-in fills empty columns from the answers (focus areas, service area)', JSON.stringify(row().focus_areas) === '["Education","Youth"]' && JSON.stringify(row().service_geographies) === '["Los Angeles, CA"]');
+  check('and leaves columns that are already set alone (budget 750000, city)', row().annual_budget === 750000 && row().city === 'Los Angeles');
+  await p.evaluate(() => go('profile')); await p.waitForTimeout(1200);
+  const save = async (v) => { await p.fill('#pf-budget', v); await p.evaluate(() => saveProfile()); await p.waitForTimeout(700); return row().annual_budget; };
+  check('an exact budget on the Profile screen ("$250,000") is stored as 250000', (await save('$250,000')) === 250000);
+  check('a range ("$100K–$500K") keeps the last exact figure instead of guessing one', (await save('$100K–$500K')) === 250000);
+  check('clearing the budget clears the number', (await save('')) === null);
+  const nums = await p.evaluate(() => ['$250,000', '250k', '$1.2M', '$100K–$500K', '<$100K', '$5M+', '100000-200000', 'about $40,000', ''].map(profileBudgetNumber));
+  check('budget parser: exact figures only (250000, 250000, 1200000, then none for ranges and words)', JSON.stringify(nums) === JSON.stringify([250000, 250000, 1200000, null, null, null, null, null, null]));
+  return t;
+});
+
+flow('onboarding-fills-profile-columns', async (browser, check) => {
+  const t = await openApp(browser, { persona: 'onboarding' });
+  const p = t.page;
+  await p.evaluate(async () => {
+    Object.assign(obState.answers, { mission: 'Arts and tutoring for teens in Chester County.', focus_areas: ['Education', 'Youth', 'Arts'], primary_location: 'Malvern, PA', geo_focus: 'Local', annual_budget: '$100K–$500K', year_founded: '2019', staff_count: '3' });
+    obState.idx = OB_STEPS.length - 1; obRender(); await obFinish();
+  });
+  await p.waitForTimeout(1200);
+  const r = t.db.profiles.find((x) => x.user_id === '00000000-0000-4000-8000-000000000005');
+  check('onboarding writes city and state ("Malvern", "PA") and the service area', r.city === 'Malvern' && r.state === 'PA' && JSON.stringify(r.service_geographies) === '["Malvern, PA"]');
+  check('onboarding writes focus areas, year founded and staff count', JSON.stringify(r.focus_areas) === '["Education","Youth","Arts"]' && r.founded_year === 2019 && r.staff_count === 3);
+  check('a budget range is not turned into a made-up number', r.annual_budget == null);
+  check('onboarding still completes', r.onboarding_complete === true);
+  return t;
+});
+
 flow('onboarding-save-failure', async (browser, check) => {
   const t = await openApp(browser, { persona: 'onboarding', failTables: ['onboarding_answers'] });
   const p = t.page;

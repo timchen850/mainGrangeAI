@@ -5178,7 +5178,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             <option value="A20">A20, Arts &amp; Culture</option>
             <option value="C30">C30, Environment</option>
           </select></div>
-        <div class="fieldset"><label class="field-label">Annual budget</label><input id="pf-budget" type="text" placeholder="$0"></div>
+        <div class="fieldset"><label class="field-label">Annual budget</label><input id="pf-budget" type="text" placeholder="e.g. $250,000"></div>
 
         <div class="divider">Programs</div>
         <div class="fieldset full"><label class="field-label">Programs &amp; services</label>
@@ -6427,6 +6427,55 @@ document.addEventListener('drop', (e) => { const b = e.target.closest && e.targe
 
 // Logic-model boxes on the profile screen and the onboarding_answers keys they save to.
 const PF_LOGIC_MODEL = [['pf-inputs', 'lm_inputs'], ['pf-activities', 'lm_activities'], ['pf-outputs', 'lm_outputs'], ['pf-outcomes', 'lm_outcomes']];
+/* Onboarding saves its answers to onboarding_answers, but the funder checks (ai-worker) and the
+   assistant (ai-chat) read the organization from `profiles`. Copy the answers they use into the
+   matching profile columns. A budget range ("$100K–$500K") has no single number, so annual_budget
+   is only set from an exact figure, such as "$250,000" typed on the Profile screen. */
+function profileBudgetNumber(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s || /[–—<>+]|\d\s*-\s*\$?\d|\bto\b|under|over|less|more|between/i.test(s)) return null;
+  const m = s.replace(/[$,\s]/g, '').match(/^(\d+(?:\.\d+)?)(k|m|thousand|million)?$/i);
+  if (!m) return null;
+  const n = Math.round(parseFloat(m[1]) * ({ k: 1e3, thousand: 1e3, m: 1e6, million: 1e6 }[(m[2] || '').toLowerCase()] || 1));
+  return n > 0 ? n : null;
+}
+function profileColumnsFromAnswers(a) {
+  a = a || {};
+  const cols = {};
+  if (Array.isArray(a.focus_areas)) cols.focus_areas = a.focus_areas.map((x) => String(x).trim()).filter(Boolean);
+  const loc = String(a.primary_location || '').trim();
+  if (loc) {
+    cols.service_geographies = [loc];
+    const parts = loc.split(',').map((x) => x.trim()).filter(Boolean);
+    const st = usaStateAbbr({ primary_location: parts[parts.length - 1] });
+    if (st) cols.state = st;
+    if (parts.length > 1) cols.city = parts.slice(0, -1).join(', ');
+  }
+  const yr = parseInt(a.year_founded, 10);
+  if (yr >= 1800 && yr <= new Date().getFullYear()) cols.founded_year = yr;
+  if (String(a.staff_count ?? '').trim() !== '') { const n = parseInt(a.staff_count, 10); if (n >= 0 && n < 1e6) cols.staff_count = n; }
+  const budget = profileBudgetNumber(a.annual_budget);
+  if (budget) cols.annual_budget = budget;
+  return cols;
+}
+// Never blocks the save that called it: a failure here only leaves the old columns in place.
+// onlyMissing (used at sign-in) fills empty columns and leaves anything already set alone.
+async function syncProfileColumns(uid, answers, opts) {
+  opts = opts || {};
+  if (!window.sb || !uid) return;
+  let cols = Object.assign(profileColumnsFromAnswers(answers), opts.extra || {});
+  if (opts.onlyMissing) {
+    const p = (window._grange && window._grange.profile) || {};
+    const empty = (v) => v == null || v === '' || (Array.isArray(v) && !v.length);
+    cols = Object.fromEntries(Object.entries(cols).filter(([k, v]) => empty(p[k]) && !empty(v)));
+  }
+  if (!Object.keys(cols).length) return;
+  try {
+    const { error } = await sb.from('profiles').update(cols).eq('user_id', uid);
+    if (error) throw error;
+    if (window._grange && window._grange.profile) Object.assign(window._grange.profile, cols);
+  } catch (e) { console.warn('profile columns sync', e); }
+}
 async function saveProfile() {
   const uid = window._grange?.user?.id;
   if (!window.sb || !uid) { toast('Sign in to save your profile.'); return; }
@@ -6457,6 +6506,8 @@ async function saveProfile() {
       window._grange.profile = { ...(window._grange.profile || {}), org_name: orgName, mission, ein, ntee_code: ntee };
       window._grange._cachedAnswers = { ...(window._grange._cachedAnswers || {}), ...saved };
     }
+    // A cleared budget clears the number too; a range leaves the last exact figure in place.
+    await syncProfileColumns(uid, { ...(window._grange?._cachedAnswers || {}), annual_budget: budget }, budget ? {} : { extra: { annual_budget: null } });
     if (typeof applyOrgIdentity === 'function') applyOrgIdentity(window._grange);
     populateProfile();
     window._pfDirty = false;
@@ -9954,6 +10005,7 @@ async function _routeAfterAuth() {
     window._grange._cachedAnswers = ansMap;
     const hasAnswers = ansMap.mission && ansMap.focus_areas && (ansMap.focus_areas || []).length > 0;
     window._grange.surveySkipped = !hasAnswers;
+    if (ctx.profile) syncProfileColumns(ctx.user.id, ansMap, { onlyMissing: true });   // accounts that onboarded before the sync existed
   }
   applyOrgIdentity(ctx);
   if (!ctx.profile) { revealPage(); go('landing'); return; }
@@ -10577,6 +10629,7 @@ async function obFinish(skipped) {
       onboarding_complete: true,
     }).eq('user_id', uid);
     if (pErr) throw pErr;
+    await syncProfileColumns(uid, a);   // location, focus areas, etc. for the funder checks
   } catch (e) {
     // Nothing reached the server, so stay here with the answers intact and let them retry.
     console.warn('onboarding save failed', e);
