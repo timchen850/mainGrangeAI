@@ -6,11 +6,16 @@
 // Gemini (primary) → Groq (fallback). Returns plain JSON { reply }.
 //
 // Secrets: GEMINI_API_KEY (required), GROQ_API_KEY (optional fallback).
+//
+// Oct 25 2026 (not deployed yet; live is v7): Groq shut down llama-3.3-70b-versatile on Aug 16,
+// so the fallback failed on every call. It now uses openai/gpt-oss-120b. Each provider gets 20 s to
+// answer, Gemini's thinking is off, and one "high demand" (500/503) error from Gemini is retried.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const GEMINI_MODEL = 'gemini-2.5-flash-lite'; // fast + cheap for chat
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
+const TIMEOUT_MS = 20000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,6 +24,14 @@ const corsHeaders = {
 };
 const json = (o: unknown, s = 200) =>
   new Response(JSON.stringify(o), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+// fetch with a deadline: a stalled provider fails over instead of hanging the assistant.
+async function fetchWithin(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, { ...init, signal: ctl.signal }); }
+  finally { clearTimeout(timer); }
+}
+const stripThink = (t: string) => t.replace(/<think>[\s\S]*?<\/think>/g, '');
 
 const SYSTEM = `You are Grange, a warm, plain-spoken grant advisor inside the Grange AI app.
 Your users are often small nonprofits who have NEVER applied for a grant. Explain like a patient mentor: short paragraphs, no jargon without a one-line definition, concrete next steps.
@@ -95,33 +108,40 @@ Deno.serve(async (req: Request) => {
   // ── Gemini primary ──
   const geminiKey = Deno.env.get('GEMINI_API_KEY');
   if (geminiKey) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-            generationConfig: { temperature: 0.6, maxOutputTokens: 700 } }) });
-      if (res.ok) {
-        const d = await res.json();
-        const reply = d?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
-        if (reply.trim()) return json({ reply: reply.trim(), model: GEMINI_MODEL });
-      } else { console.error('Gemini chat failed', res.status, await res.text().catch(() => '')); }
-    } catch (e) { console.error('Gemini chat threw', e); }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 1200));
+      try {
+        const res = await fetchWithin(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+              generationConfig: { temperature: 0.6, maxOutputTokens: 700, thinkingConfig: { thinkingBudget: 0 } } }) }, TIMEOUT_MS);
+        if (res.ok) {
+          const d = await res.json();
+          const reply = d?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
+          if (reply.trim()) return json({ reply: reply.trim(), model: GEMINI_MODEL });
+          break;
+        }
+        console.error('Gemini chat failed', res.status, await res.text().catch(() => ''));
+        if (![500, 503].includes(res.status)) break;   // a 429 quota error won't clear in a second
+      } catch (e) { console.error('Gemini chat threw or timed out', e); break; }
+    }
   }
 
   // ── Groq fallback ──
   const groqKey = Deno.env.get('GROQ_API_KEY');
   if (groqKey) {
     try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const res = await fetchWithin('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
-        body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.6, max_tokens: 700,
+        // gpt-oss reasons before it answers, and those tokens count against the cap: leave room.
+        body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.6, max_completion_tokens: 1400, reasoning_effort: 'low',
           messages: [{ role: 'system', content: SYSTEM + '\n\nORGANIZATION CONTEXT:\n' + ctx + (grantCtx ? '\n\nGRANT THE USER IS WORKING ON:\n' + grantCtx : '') + ragText },
             ...history.map((h) => ({ role: h.role === 'assistant' ? 'assistant' : 'user', content: h.content })),
-            { role: 'user', content: message }] }) });
+            { role: 'user', content: message }] }) }, TIMEOUT_MS);
       if (res.ok) {
         const d = await res.json();
-        const reply = d?.choices?.[0]?.message?.content ?? '';
+        const reply = stripThink(d?.choices?.[0]?.message?.content ?? '');
         if (reply.trim()) return json({ reply: reply.trim(), model: GROQ_MODEL });
       } else { console.error('Groq chat failed', res.status, await res.text().catch(() => '')); }
     } catch (e) { console.error('Groq chat threw', e); }
