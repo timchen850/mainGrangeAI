@@ -309,6 +309,33 @@ flow('draft-honesty-rules-and-blanks', async (browser, check) => {
   return t;
 });
 
+// Test take, Oct 25: the plan call stalled and the generator sat on "Mapping out the approach…" for minutes.
+flow('stalled-ai-call-times-out', async (browser, check) => {
+  const t = await openApp(browser, { persona: 'np' });
+  const p = t.page; const toasts = await toastSpy(p);
+  const bodies = []; let hangDraft = false;
+  await p.route('**/functions/v1/generate-proposal', (r) => {
+    const body = r.request().postData() || ''; bodies.push(body);
+    if (/PLAN of how you will approach/.test(body)) return;   // never answer: a stalled call
+    if (hangDraft) return;
+    return r.fallback();
+  });
+  await p.evaluate(() => { GEN_TIMEOUTS.first = 1500; GEN_TIMEOUTS.idle = 1500; });
+  await p.evaluate(() => go('generator')); await p.waitForTimeout(800);
+  await p.evaluate(() => { const s = (window._genPipeline || [])[0]; if (s) pickSaved(s.id); }); await p.waitForTimeout(800);
+  await fillGenForm(p); await p.click('#gen-btn'); await p.waitForTimeout(9000);
+  check('a stalled plan is skipped and the draft is still written', toasts.some((m) => /Draft ready/.test(m)) && await p.evaluate(() => document.getElementById('out-doc').textContent.length > 200));
+  const draftBody = JSON.parse(bodies.find((b) => /Write a complete|Full Grant Narrative/.test(b)) || '{}');
+  check('drafts ask for room (8192 tokens) with Gemini thinking off', draftBody.generationConfig?.maxOutputTokens === 8192 && draftBody.generationConfig?.thinkingConfig?.thinkingBudget === 0);
+  check('the plan call also turns thinking off', bodies.filter((b) => /PLAN of how you will approach/.test(b)).every((b) => JSON.parse(b).generationConfig?.thinkingConfig?.thinkingBudget === 0));
+  hangDraft = true;
+  await p.evaluate(() => { genShowConfig && genShowConfig(); }); await p.waitForTimeout(500);
+  await p.click('#gen-btn'); await p.waitForTimeout(8000);
+  check('a stalled draft says the writer stopped responding, instead of hanging', toasts.some((m) => /stopped responding/.test(m)));
+  check('and the form is back to try again', await p.isVisible('#gen-btn'));
+  return t;
+});
+
 flow('save-failures-are-visible', async (browser, check) => {
   const t = await openApp(browser, { persona: 'np', failTables: ['readiness_items'] });
   const p = t.page;

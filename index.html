@@ -7514,32 +7514,60 @@ let _genAbort = null;
    org's voice. Best-effort + safety-checked: a rewrite is accepted ONLY if it
    keeps the structure and length, so it can never truncate or degrade a draft.
    Runs through generate-proposal (raw model proxy) — no ai-worker dependency. */
+/* Every AI call gets a deadline. Gemini can stall when it is overloaded, and a stalled stream
+   used to leave the generator on "Mapping out the approach…" for minutes. firstMs is how long to
+   wait for the response to start, idleMs how long to wait between chunks. A timeout throws a
+   TimeoutError, never an AbortError, so it is not mistaken for the user pressing Stop. */
+function genDeadline(userSignal, firstMs) {
+  const ctl = new AbortController();
+  const st = { timedOut: false, timer: null };
+  const arm = (ms) => { clearTimeout(st.timer); st.timer = setTimeout(() => { st.timedOut = true; ctl.abort(); }, ms); };
+  if (userSignal) { if (userSignal.aborted) ctl.abort(); else userSignal.addEventListener('abort', () => ctl.abort(), { once: true }); }
+  arm(firstMs);
+  return { signal: ctl.signal, arm, done: () => clearTimeout(st.timer), timedOut: () => st.timedOut };
+}
+function genTimeoutError() {
+  const e = new Error('The AI writer stopped responding. That usually clears in a minute. Please try again.');
+  e.name = 'TimeoutError';
+  return e;
+}
+const GEN_TIMEOUTS = { first: 60000, idle: 30000 };   // ms; the QA harness shortens them
+// Gemini 2.5 Flash "thinks" before it answers, and those tokens come out of maxOutputTokens: with
+// a long prompt it could spend the whole cap thinking and send back nothing. Thinking stays off.
+const GEN_THINKING = { thinkingBudget: 0 };
 async function callGenerateOnce(prompt, signal) {
   const { data: { session } } = await window.sb.auth.getSession();
   if (!session) throw new Error('no session');
-  const res = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/generate-proposal', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
-    signal,
-    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 2048 } }),
-  });
-  if (!res.ok) throw new Error('gen ' + res.status);
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '', out = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n'); buffer = lines.pop();
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const sstr = line.slice(6).trim();
-      if (!sstr || sstr === '[DONE]') continue;
-      try { out += JSON.parse(sstr)?.candidates?.[0]?.content?.parts?.[0]?.text || ''; } catch (_) {}
+  const dl = genDeadline(signal, GEN_TIMEOUTS.first);
+  try {
+    const res = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/generate-proposal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+      signal: dl.signal,
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 4096, thinkingConfig: GEN_THINKING } }),
+    });
+    if (!res.ok) throw new Error('gen ' + res.status);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '', out = '';
+    while (true) {
+      dl.arm(GEN_TIMEOUTS.idle);
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n'); buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const sstr = line.slice(6).trim();
+        if (!sstr || sstr === '[DONE]') continue;
+        try { out += JSON.parse(sstr)?.candidates?.[0]?.content?.parts?.[0]?.text || ''; } catch (_) {}
+      }
     }
-  }
-  return out.replace(/```html?\n?/gi, '').replace(/```\n?/g, '').trim();
+    return out.replace(/```html?\n?/gi, '').replace(/```\n?/g, '').trim();
+  } catch (e) {
+    if (dl.timedOut()) throw genTimeoutError();
+    throw e;
+  } finally { dl.done(); }
 }
 function _countHeadings(html) { const m = String(html).match(/<h4/gi); return m ? m.length : 0; }
 function _plainLen(html) { const t = document.createElement('template'); t.innerHTML = String(html || ''); return (t.content.textContent || '').trim().length; }
@@ -8265,16 +8293,22 @@ async function generate() {
 
     toast('Drafting your proposal…');
 
+    const dl = genDeadline(_genAbort.signal, GEN_TIMEOUTS.first);
+    let rawText = '';
+    let streamErr = '';
+    const genStart = Date.now();
+    try {
     const res = await fetch(edgeFnUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + session.access_token,
       },
-      signal: _genAbort.signal,
+      signal: dl.signal,
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+        // A 900–1,100-word draft in HTML runs about 2,000 tokens; 2048 cut drafts off.
+        generationConfig: { temperature: 0.7, maxOutputTokens: 8192, thinkingConfig: GEN_THINKING },
       }),
     });
 
@@ -8296,11 +8330,9 @@ async function generate() {
     const reader  = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let rawText = '';
-    let streamErr = '';
-    const genStart = Date.now();
 
     while (true) {
+      dl.arm(GEN_TIMEOUTS.idle);
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -8331,6 +8363,11 @@ async function generate() {
         } catch (_) { /* skip malformed chunk */ }
       }
     }
+
+    } catch (e) {
+      if (dl.timedOut()) throw genTimeoutError();
+      throw e;
+    } finally { dl.done(); }
 
     // An empty answer (the AI service was overloaded, or stopped early) is a failure, not a draft:
     // never score, save or announce a blank document.
