@@ -233,7 +233,7 @@ targets.mjs lists 22 small controls, all spaced text links or controls with an e
 
 ## Next up
 
-- Merged into `main` on 2026-10-24 at 20:57 UTC (eee4bf7) with Tim's OK, again for rows 153 (b4cde2f) and 154–158 (Tim's OK, ~21:50 UTC). Later fixes go to the branch; ask Tim before merging again.
+- Merged into `main` on 2026-10-24 at 20:57 UTC (eee4bf7) with Tim's OK, again for rows 153 (b4cde2f), 154–158 (~21:50 UTC) and 159–161 (Oct 25), each with Tim's OK. Later fixes go to the branch; ask Tim before merging again.
 
 - Server-side, checked live Oct 24 (21:44 UTC, read-only): nothing deployed. Live `generate-proposal` is v6, an older version limited to 10 a day per account; the repo version reads `profiles.tier`, which doesn't exist, so it would treat everyone as Free (2 drafts a month). Don't deploy it before Monday. Live `create-checkout` is v2 with the old $49/$149 prices; payments aren't open, so it can wait. The `exemplar_search_not_public` migration is safe to apply on its own (Tim's call). Advisors also flag `claim_membership()` and `is_member()` as callable by signed-out users, an unindexed foreign key on 7 tables, and leaked-password protection off (a Pro-plan Auth setting). Fix `stripe-webhook` before payments.
 - Free trial (Tim): the Plans screen says "All paid plans include a 14-day free trial" and its buttons read "Start Free Trial", but `create-checkout` sets up no trial. Add `trial_period_days: 14` to the checkout session or cut the line before payments open.
