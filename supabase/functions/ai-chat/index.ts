@@ -7,7 +7,7 @@
 //
 // Secrets: GEMINI_API_KEY (required), GROQ_API_KEY (optional fallback).
 //
-// Oct 25 2026 (not deployed yet; live is v7): Groq shut down llama-3.3-70b-versatile on Aug 16,
+// Oct 25 2026 (deployed as v8 with Tim's OK): Groq shut down llama-3.3-70b-versatile on Aug 16,
 // so the fallback failed on every call. It now uses openai/gpt-oss-120b. Each provider gets 20 s to
 // answer, Gemini's thinking is off, and one "high demand" (500/503) error from Gemini is retried.
 

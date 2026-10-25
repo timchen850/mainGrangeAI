@@ -1012,7 +1012,7 @@ flow('plan-change-before-billing', async (browser, check) => {
     ? r.fulfill({ status: 400, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ code: 'PGRST204', message: "Could not find the 'tier' column of 'profiles' in the schema cache", details: null, hint: null }) })
     : r.fallback());
   await p.evaluate(() => go('plan')); await p.waitForTimeout(900);
-  await p.click('#plan button:has-text("Start Free Trial") >> nth=0'); await p.waitForTimeout(900);
+  await p.click('#plan button:has-text("Choose Starter")'); await p.waitForTimeout(900);
   const msg = await p.textContent('#toast-text');
   check('says paid plans are not open yet (not "try again")', /aren.t open yet/.test(msg) && !/try again/i.test(msg));
   t.errors = t.errors.filter((e) => !/400|Bad Request/.test(e));

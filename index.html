@@ -5597,7 +5597,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             <div class="pc-save" id="starter-save">You save $59.88 a year</div>
             <p class="pc-desc">For groups applying to a few grants a year.</p>
             <p class="pc-earn" id="starter-earn">One $1,000 grant pays for 8 years of Starter.</p>
-            <button class="pc-cta primary" onclick="selectTier('starter')">Start Free Trial</button>
+            <button class="pc-cta primary" onclick="selectTier('starter')">Choose Starter</button>
             <div class="pc-div"></div>
             <div class="pc-features">
               <div class="pf-row"><div class="pf-ic yes"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/></svg></div><span class="pf-text">Profile from a survey or Form 990</span></div>
@@ -5620,7 +5620,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             <div class="pc-save" id="pro-save">You save $131.88 a year</div>
             <p class="pc-desc">For organizations that apply all year and want to keep every grant they win.</p>
             <p class="pc-earn" id="pro-earn">One $5,000 grant pays for 16 years of Pro.</p>
-            <button class="pc-cta primary" onclick="selectTier('pro')">Start Free Trial</button>
+            <button class="pc-cta primary" onclick="selectTier('pro')">Choose Pro</button>
             <div class="pc-div"></div>
             <div class="pc-features">
               <div class="pf-row"><div class="pf-ic yes"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/></svg></div><span class="pf-text">Profile from a survey or Form 990</span></div>
@@ -5635,7 +5635,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
           </div>
         </div>
 
-        <p class="pricing-foot">All paid plans include a 14-day free trial. No credit card required to start.<br>Grant amounts are examples: funders decide every award.</p>
+        <p class="pricing-foot">Grant amounts are examples: funders decide every award.</p>
       </div>
     </main>
   </div>
@@ -5663,7 +5663,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
         ctaEl.onclick = function(){ selectTier('free'); };
       } else {
         ctaEl.className = 'pc-cta primary';
-        ctaEl.textContent = 'Start Free Trial';
+        ctaEl.textContent = tid === 'pro' ? 'Choose Pro' : 'Choose Starter';
         ctaEl.onclick = function(){ selectTier(tid); };
       }
     });
