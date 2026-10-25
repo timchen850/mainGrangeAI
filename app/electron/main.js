@@ -1,123 +1,36 @@
-const { app, BrowserWindow, ipcMain, shell, Menu, nativeTheme } = require('electron')
+const { app, BrowserWindow, shell } = require('electron')
 const path = require('path')
-
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 900,
-    minHeight: 600,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 18, y: 18 },
-    vibrancy: 'under-window',
-    visualEffectState: 'active',
-    backgroundColor: '#00000000',
-    transparent: true,
+    width: 1200,
+    height: 800,
+    icon: path.join(__dirname, '../assets/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
     },
-    icon: path.join(__dirname, '../assets/icon.png'),
-    show: false,
   })
 
-  // Graceful show
-  win.once('ready-to-show', () => {
-    win.show()
-    if (isDev) win.webContents.openDevTools({ mode: 'detach' })
-  })
-
-  // Open external links in default browser
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+  // Open links in the normal web browser instead of the app
+  win.webContents.setWindowOpenHandler(function (details) {
+    shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
-  if (isDev) {
-    win.loadURL('http://localhost:5173')
-  } else {
+  if (app.isPackaged) {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
+  } else {
+    win.loadURL('http://localhost:5173')
   }
-
-  return win
 }
 
-// Build the app menu
-function buildMenu() {
-  const template = [
-    {
-      label: 'Grange AI',
-      submenu: [
-        { role: 'about', label: 'About Grange AI' },
-        { type: 'separator' },
-        { role: 'services' },
-        { type: 'separator' },
-        { role: 'hide', label: 'Hide Grange AI' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit', label: 'Quit Grange AI' },
-      ],
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
-    {
-      label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
-        { type: 'separator' },
-        { role: 'front' },
-      ],
-    },
-  ]
+app.whenReady().then(createWindow)
 
-  const menu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(menu)
-}
-
-app.whenReady().then(() => {
-  nativeTheme.themeSource = 'dark'
-  buildMenu()
-  createWindow()
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
-
-app.on('window-all-closed', () => {
+// Quit when all windows are closed (except on Mac)
+app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit()
 })
 
-// IPC handlers
-ipcMain.handle('get-platform', () => process.platform)
-ipcMain.handle('get-version', () => app.getVersion())
-ipcMain.handle('open-external', (_, url) => shell.openExternal(url))
+app.on('activate', function () {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow()
+})

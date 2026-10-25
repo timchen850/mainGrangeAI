@@ -1,380 +1,71 @@
-import React, { useEffect, useState, useRef } from 'react'
-import { sb, streamProposal } from '../lib/supabase'
-import { useToast } from '../lib/toast'
-import { useAuth } from '../lib/auth'
-import PaywallBanner from '../components/PaywallBanner'
+import { useState } from 'react'
+import { supabase, callFunction } from '../lib/supabase'
 
-const TIER_LIMITS = { free: 2, starter: 15, pro: Infinity }
+export default function Generator({ user, grant }) {
+  const [grantName, setGrantName] = useState(grant ? grant.title : '')
+  const [funder, setFunder] = useState(grant ? grant.agency : '')
+  const [amount, setAmount] = useState('')
+  const [project, setProject] = useState('')
+  const [draft, setDraft] = useState('')
+  const [loading, setLoading] = useState(false)
 
-const SECTIONS = [
-  { key: 'executive_summary', label: 'Executive Summary', words: 300 },
-  { key: 'needs_statement', label: 'Statement of Need', words: 600 },
-  { key: 'goals_objectives', label: 'Goals & Objectives', words: 400 },
-  { key: 'project_design', label: 'Project Design', words: 800 },
-  { key: 'evaluation_plan', label: 'Evaluation Plan', words: 500 },
-  { key: 'organization_capacity', label: 'Organizational Capacity', words: 400 },
-  { key: 'budget_narrative', label: 'Budget Narrative', words: 500 },
-  { key: 'sustainability', label: 'Sustainability Plan', words: 400 },
-]
+  async function generate() {
+    if (project === '') {
+      alert('Please describe your project.')
+      return
+    }
 
-const STATUS_LABELS = {
-  empty: 'Empty',
-  ai_drafting: 'Drafting…',
-  ai_draft: 'AI Draft',
-  edited: 'Edited',
-  final: 'Final',
-}
+    setLoading(true)
 
-const STATUS_PILLS = {
-  empty:      'pill-default',
-  ai_drafting:'pill-warn',
-  ai_draft:   'pill-info',
-  edited:     'pill-accent',
-  final:      'pill-ok',
-}
+    const result = await supabase.from('onboarding_answers').select('answers').eq('user_id', user.id).single()
+    const answers = result.data ? result.data.answers : {}
 
-export default function Generator({ setPage }) {
-  const { toast } = useToast()
-  const { profile } = useAuth()
-  const tier = profile?.tier || 'free'
-  const monthlyLimit = TIER_LIMITS[tier] ?? TIER_LIMITS.free
-  const isProUser = tier === 'pro'
+    let prompt = 'Write a grant proposal for "' + grantName + '" from ' + funder + '.\n'
+    prompt += 'Amount requested: ' + amount + '\n'
+    prompt += 'Organization: ' + answers.org_name + '\n'
+    prompt += 'Mission: ' + answers.mission + '\n'
+    prompt += 'Project: ' + project + '\n'
+    prompt += 'Include: Executive Summary, Statement of Need, Project Description, Goals, Evaluation, Budget.\n'
+    prompt += 'Mark unsure facts with [VERIFY: ...].'
 
-  const [grants, setGrants] = useState([])
-  const [selectedGrant, setSelectedGrant] = useState(null)
-  const [proposal, setProposal] = useState(null)
-  const [sections, setSections] = useState({})
-  const [activeSection, setActiveSection] = useState(SECTIONS[0].key)
-  const [streaming, setStreaming] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [editContent, setEditContent] = useState('')
-  const [monthlyUsed, setMonthlyUsed] = useState(0)
-  const textareaRef = useRef(null)
-
-  useEffect(() => {
-    sb.from('grants')
-      .select('*, opportunities(title, funder_name, description, amount_max)')
-      .in('status', ['saved', 'drafting'])
-      .order('updated_at', { ascending: false })
-      .then(({ data }) => setGrants(data || []))
-    loadMonthlyUsage()
-  }, [])
-
-  async function loadMonthlyUsage() {
-    const monthStart = new Date().toISOString().slice(0, 7) + '-01'
-    const { data } = await sb.from('proposal_usage').select('count').gte('used_on', monthStart)
-    const total = (data || []).reduce((s, r) => s + (r.count ?? 0), 0)
-    setMonthlyUsed(total)
-  }
-
-  async function loadProposal(grant) {
-    setSelectedGrant(grant)
-    const { data: p } = await sb.from('proposals').select('*').eq('grant_id', grant.id).single()
-    if (p) {
-      setProposal(p)
-      const { data: s } = await sb.from('proposal_sections').select('*').eq('proposal_id', p.id)
-      const map = {}
-      s?.forEach(sec => { map[sec.section_key] = sec })
-      setSections(map)
+    const data = await callFunction('generate-proposal', { prompt: prompt })
+    if (data && data.text) {
+      setDraft(data.text)
     } else {
-      const { data: newP } = await sb.from('proposals').insert({ grant_id: grant.id }).select().single()
-      setProposal(newP)
-      setSections({})
+      alert('Something went wrong, try again.')
     }
+    setLoading(false)
   }
 
-  async function draftSection(sectionKey) {
-    if (!proposal || !selectedGrant) return
-    setStreaming(true)
-    const sec = sections[sectionKey]
-    const tmpId = Date.now()
-
-    setSections(prev => ({
-      ...prev,
-      [sectionKey]: { ...(prev[sectionKey] || {}), status: 'ai_drafting', content: '' },
-    }))
-
-    let accumulated = ''
-    try {
-      await streamProposal({
-        proposal_id: proposal.id,
-        section_key: sectionKey,
-        grant_title: selectedGrant.opportunities?.title,
-        grant_description: selectedGrant.opportunities?.description,
-        funder_name: selectedGrant.opportunities?.funder_name,
-      }, chunk => {
-        accumulated += chunk
-        setSections(prev => ({
-          ...prev,
-          [sectionKey]: { ...(prev[sectionKey] || {}), content: accumulated, status: 'ai_drafting' },
-        }))
-      })
-
-      // Persist
-      const { data: saved } = await sb.from('proposal_sections').upsert({
-        proposal_id: proposal.id,
-        section_key: sectionKey,
-        content: accumulated,
-        status: 'ai_draft',
-      }).select().single()
-
-      setSections(prev => ({ ...prev, [sectionKey]: saved }))
-      toast('Section drafted!', 'ok')
-      loadMonthlyUsage()
-    } catch (err) {
-      toast('Drafting failed: ' + err.message, 'danger')
-      setSections(prev => ({
-        ...prev,
-        [sectionKey]: { ...(prev[sectionKey] || {}), status: 'empty' },
-      }))
-    }
-    setStreaming(false)
+  async function saveDraft() {
+    await supabase.from('proposals').insert({ user_id: user.id, grant_title: grantName, content: draft })
+    alert('Draft saved!')
   }
-
-  async function saveEdit() {
-    if (!proposal) return
-    const { data: saved } = await sb.from('proposal_sections').upsert({
-      proposal_id: proposal.id,
-      section_key: activeSection,
-      content: editContent,
-      status: 'edited',
-    }).select().single()
-    setSections(prev => ({ ...prev, [activeSection]: saved }))
-    setEditing(false)
-    toast('Section saved', 'ok')
-  }
-
-  async function markFinal(sectionKey) {
-    if (!sections[sectionKey]) return
-    await sb.from('proposal_sections').update({ status: 'final' }).eq('id', sections[sectionKey].id)
-    setSections(prev => ({ ...prev, [sectionKey]: { ...prev[sectionKey], status: 'final' } }))
-    toast('Marked as final', 'ok')
-  }
-
-  const activeSec = sections[activeSection]
-  const wordCount = activeSec?.content ? activeSec.content.split(/\s+/).filter(Boolean).length : 0
-  const targetWords = SECTIONS.find(s => s.key === activeSection)?.words || 500
-  const allDrafted = SECTIONS.filter(s => sections[s.key]?.status !== 'empty' && sections[s.key]?.status != null).length
 
   return (
-    <div className="fade-in" style={{ display: 'flex', gap: 20, height: '100%' }}>
-      {/* Left: grant selector + section nav */}
-      <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* Grant picker */}
-        <div className="card" style={{ padding: 14 }}>
-          <div className="label" style={{ marginBottom: 8 }}>Grant</div>
-          {grants.length === 0 ? (
-            <p style={{ fontSize: 12, color: 'var(--ink-tertiary)' }}>Save grants in Discovery first.</p>
-          ) : (
-            <select
-              className="input select"
-              style={{ fontSize: 12.5, padding: '7px 10px' }}
-              value={selectedGrant?.id || ''}
-              onChange={e => {
-                const g = grants.find(g => g.id === e.target.value)
-                if (g) loadProposal(g)
-              }}
-            >
-              <option value="">Select a grant…</option>
-              {grants.map(g => (
-                <option key={g.id} value={g.id}>{g.opportunities?.title?.slice(0, 36) || 'Untitled'}</option>
-              ))}
-            </select>
-          )}
+    <div>
+      <h1>Write a Proposal</h1>
+      <label>Grant name</label>
+      <input value={grantName} onChange={(e) => setGrantName(e.target.value)} />
+      <label>Funder</label>
+      <input value={funder} onChange={(e) => setFunder(e.target.value)} />
+      <label>Amount</label>
+      <input value={amount} onChange={(e) => setAmount(e.target.value)} />
+      <label>Describe the project</label>
+      <textarea rows="5" value={project} onChange={(e) => setProject(e.target.value)} />
+
+      <button className="btn" onClick={generate} disabled={loading}>
+        {loading ? 'Writing...' : 'Write my draft'}
+      </button>
+
+      {draft !== '' && (
+        <div>
+          <h2>Your draft</h2>
+          <textarea className="draft" rows="25" value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <button className="btn-outline" onClick={() => navigator.clipboard.writeText(draft)}>Copy</button>{' '}
+          <button className="btn-outline" onClick={saveDraft}>Save</button>
         </div>
-
-        {/* Section nav */}
-        {selectedGrant && (
-          <div className="card" style={{ padding: 8, flex: 1, overflow: 'auto' }}>
-            <div className="label" style={{ padding: '6px 8px' }}>Sections</div>
-            {SECTIONS.map(sec => {
-              const s = sections[sec.key]
-              const status = s?.status || 'empty'
-              return (
-                <button
-                  key={sec.key}
-                  onClick={() => { setActiveSection(sec.key); setEditing(false) }}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    gap: 8, padding: '8px 10px', borderRadius: 8,
-                    background: activeSection === sec.key ? 'var(--glass-mid)' : 'none',
-                    border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left',
-                    color: 'var(--ink)', fontFamily: 'var(--font)', fontSize: 12.5,
-                    fontWeight: activeSection === sec.key ? 600 : 400,
-                    transition: 'background var(--dur-fast)',
-                  }}
-                >
-                  <span className="truncate">{sec.label}</span>
-                  <span className={`pill ${STATUS_PILLS[status]}`} style={{ fontSize: 9.5, padding: '2px 5px', flexShrink: 0 }}>
-                    {STATUS_LABELS[status]}
-                  </span>
-                </button>
-              )
-            })}
-            <div className="divider" style={{ margin: '8px 0' }} />
-            <div style={{ padding: '4px 8px 8px', fontSize: 11.5, color: 'var(--ink-tertiary)' }}>
-              {allDrafted}/{SECTIONS.length} sections drafted
-            </div>
-          </div>
-        )}
-        {/* RAG — show paywall for non-Pro, feature panel for Pro */}
-        {isProUser ? (
-          <div className="card" style={{ padding: 14, marginTop: 4 }}>
-            <div className="label" style={{ marginBottom: 6 }}>Past Proposals (RAG)</div>
-            <p style={{ fontSize: 12, color: 'var(--ink-tertiary)', margin: 0 }}>
-              Your past proposals will automatically ground new drafts in your org's voice.
-            </p>
-          </div>
-        ) : (
-          <PaywallBanner
-            feature="Past Proposals (RAG)"
-            plan="Pro"
-            setPage={setPage}
-            style={{ marginTop: 4 }}
-          />
-        )}
-      </div>
-
-      {/* Right: editor */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
-        {!selectedGrant ? (
-          <div className="card" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="empty-state">
-              <div className="empty-icon">✍️</div>
-              <div className="empty-title">Select a grant to start drafting</div>
-              <div className="empty-subtitle">Choose a saved grant from the panel on the left to begin generating your proposal.</div>
-            </div>
-          </div>
-        ) : (
-          <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Section toolbar */}
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0,
-            }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 15 }}>
-                  {SECTIONS.find(s => s.key === activeSection)?.label}
-                </div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-tertiary)', marginTop: 2 }}>
-                  {wordCount} / {targetWords} words
-                  {activeSec?.status && <span className={`pill ${STATUS_PILLS[activeSec.status]}`} style={{ marginLeft: 8, fontSize: 9.5, padding: '2px 5px' }}>{STATUS_LABELS[activeSec.status]}</span>}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {activeSec?.content && !editing && (
-                  <>
-                    <button className="btn btn-ghost btn-sm" onClick={() => { setEditContent(activeSec.content); setEditing(true) }}>
-                      Edit
-                    </button>
-                    {activeSec.status !== 'final' && (
-                      <button className="btn btn-glass btn-sm" onClick={() => markFinal(activeSection)}>
-                        Mark Final
-                      </button>
-                    )}
-                  </>
-                )}
-                {editing && (
-                  <>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>Cancel</button>
-                    <button className="btn btn-accent btn-sm" onClick={saveEdit}>Save</button>
-                  </>
-                )}
-                {/* Draft quota pill */}
-                {monthlyLimit !== Infinity && (
-                  <span style={{
-                    fontSize: 11, color: monthlyUsed >= monthlyLimit ? 'var(--danger, #e05)' : 'var(--ink-tertiary)',
-                    fontWeight: 500, alignSelf: 'center',
-                  }}>
-                    {monthlyUsed}/{monthlyLimit} drafts
-                  </span>
-                )}
-                <button
-                  className="btn btn-accent btn-sm"
-                  onClick={() => draftSection(activeSection)}
-                  disabled={streaming || monthlyUsed >= monthlyLimit}
-                  title={monthlyUsed >= monthlyLimit ? `Monthly limit reached (${monthlyLimit} drafts on ${tier} plan)` : undefined}
-                >
-                  {streaming ? (
-                    <><span className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} /> Drafting…</>
-                  ) : monthlyUsed >= monthlyLimit ? (
-                    <>Limit reached</>
-                  ) : (
-                    <><SparkleIcon /> {activeSec?.content ? 'Re-draft' : 'Draft with AI'}</>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Word progress */}
-            <div className="progress-bar" style={{ height: 2, borderRadius: 0 }}>
-              <div
-                className="progress-fill"
-                style={{
-                  width: `${Math.min(100, (wordCount / targetWords) * 100)}%`,
-                  background: wordCount >= targetWords ? 'var(--ok)' : 'var(--accent)',
-                }}
-              />
-            </div>
-
-            {/* Content area */}
-            <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
-              {editing ? (
-                <textarea
-                  ref={textareaRef}
-                  className="input textarea"
-                  style={{
-                    height: '100%', minHeight: 400, fontSize: 14, lineHeight: 1.7,
-                    resize: 'none', background: 'transparent', border: '1px solid var(--accent)',
-                  }}
-                  value={editContent}
-                  onChange={e => setEditContent(e.target.value)}
-                  autoFocus
-                />
-              ) : activeSec?.content ? (
-                <div style={{
-                  fontSize: 14, lineHeight: 1.75, color: 'var(--ink)',
-                  whiteSpace: 'pre-wrap', userSelect: 'text',
-                }}>
-                  {activeSec.content}
-                  {streaming && activeSec.status === 'ai_drafting' && (
-                    <span style={{
-                      display: 'inline-block', width: 2, height: 16,
-                      background: 'var(--accent)', marginLeft: 2,
-                      animation: 'blink 1s step-end infinite',
-                      verticalAlign: 'text-bottom',
-                    }} />
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                  <div className="empty-state">
-                    <div className="empty-icon">
-                      {streaming ? <span className="spinner spinner-lg" /> : '✨'}
-                    </div>
-                    <div className="empty-title">{streaming ? 'Drafting your section…' : 'No content yet'}</div>
-                    <div className="empty-subtitle">
-                      {streaming ? 'AI is writing your ' + SECTIONS.find(s => s.key === activeSection)?.label : 'Click "Draft with AI" to generate this section using your org profile and grant details.'}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <style>{`
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-      `}</style>
+      )}
     </div>
-  )
-}
-
-function SparkleIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-    </svg>
   )
 }

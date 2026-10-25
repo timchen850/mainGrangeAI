@@ -1,6 +1,5 @@
-import React, { useState } from 'react'
-import { useAuth } from './lib/auth'
-import TitleBar from './components/TitleBar'
+import { useState, useEffect } from 'react'
+import { supabase } from './lib/supabase'
 import Sidebar from './components/Sidebar'
 import Auth from './screens/Auth'
 import Dashboard from './screens/Dashboard'
@@ -10,77 +9,53 @@ import Grants from './screens/Grants'
 import Readiness from './screens/Readiness'
 import Chat from './screens/Chat'
 import Profile from './screens/Profile'
-import ApplicationWriter from './screens/ApplicationWriter'
 import Pricing from './screens/Pricing'
 
-const SCREENS = {
-  dashboard: Dashboard,
-  discovery: Discovery,
-  generator: Generator,
-  grants: Grants,
-  readiness: Readiness,
-  chat: Chat,
-  profile: Profile,
-  'application-writer': ApplicationWriter,
-  pricing: Pricing,
-}
-
 export default function App() {
-  const { session, loading } = useAuth()
-  // page can be a string or { name, ...params }
-  const [pageState, setPageState] = useState('dashboard')
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState('dashboard')
+  // the grant picked on the Discovery page, used by the Generator
+  const [selectedGrant, setSelectedGrant] = useState(null)
 
-  const pageName   = typeof pageState === 'string' ? pageState : pageState.name
-  const pageParams = typeof pageState === 'string' ? {} : pageState
+  // Check if someone is logged in when the app opens
+  useEffect(() => {
+    supabase.auth.getSession().then((result) => {
+      if (result.data.session) {
+        setUser(result.data.session.user)
+      }
+      setLoading(false)
+    })
 
-  // setPage accepts either a string or an object { name, ...params }
-  const setPage = (target) => setPageState(target)
+    // Update when they log in or out
+    supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session ? session.user : null)
+    })
+  }, [])
 
-  if (loading) return <SplashScreen />
-  if (!session) return <Auth />
+  if (loading) {
+    return <div className="center">Loading...</div>
+  }
 
-  const Screen = SCREENS[pageName] || Dashboard
+  if (!user) {
+    return <Auth />
+  }
+
+  // Pick which screen to show
+  let screen
+  if (page === 'dashboard') screen = <Dashboard user={user} setPage={setPage} />
+  else if (page === 'discovery') screen = <Discovery user={user} setPage={setPage} setSelectedGrant={setSelectedGrant} />
+  else if (page === 'generator') screen = <Generator user={user} grant={selectedGrant} />
+  else if (page === 'grants') screen = <Grants user={user} />
+  else if (page === 'readiness') screen = <Readiness user={user} />
+  else if (page === 'chat') screen = <Chat />
+  else if (page === 'profile') screen = <Profile user={user} />
+  else if (page === 'pricing') screen = <Pricing />
 
   return (
-    <div className="app-shell">
-      <TitleBar page={pageName} />
-      <div className="layout">
-        <Sidebar page={pageName} setPage={setPage} />
-        <main className="main-content">
-          <Screen setPage={setPage} pageParams={pageParams} />
-        </main>
-      </div>
-    </div>
-  )
-}
-
-function SplashScreen() {
-  return (
-    <div style={{
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg-base)',
-      gap: 20,
-    }}>
-      <div style={{
-        width: 56, height: 56,
-        background: 'var(--accent)',
-        borderRadius: 16,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 26, fontWeight: 800, color: 'white',
-        boxShadow: '0 4px 24px rgba(232,92,58,0.45)',
-        animation: 'pulse 1.5s ease-in-out infinite',
-      }}>G</div>
-      <span style={{ color: 'var(--ink-tertiary)', fontSize: 13 }}>Loading Grange AI…</span>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 4px 24px rgba(232,92,58,0.45); }
-          50% { transform: scale(1.05); box-shadow: 0 8px 32px rgba(232,92,58,0.6); }
-        }
-      `}</style>
+    <div className="layout">
+      <Sidebar page={page} setPage={setPage} />
+      <main className="main">{screen}</main>
     </div>
   )
 }

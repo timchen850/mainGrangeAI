@@ -1,151 +1,39 @@
-// Grange AI — grounded grant-advisor chatbot (server-side)
-//
-// Powers the in-app AI assistant. Authenticates the user, pulls their REAL
-// org profile + pipeline + deadlines from the database (so answers are
-// grounded, not generic), builds a grant-expert system prompt, and calls
-// Gemini (primary) → Groq (fallback). Returns plain JSON { reply }.
-//
-// Secrets: GEMINI_API_KEY (required), GROQ_API_KEY (optional fallback).
-//
-// Oct 25 2026 (deployed as v8 with Tim's OK): Groq shut down llama-3.3-70b-versatile on Aug 16,
-// so the fallback failed on every call. It now uses openai/gpt-oss-120b. Each provider gets 20 s to
-// answer, Gemini's thinking is off, and one "high demand" (500/503) error from Gemini is retried.
+// The in-app grant assistant
+import { corsHeaders, sendJson, getSupabase, getUser, askAI } from '../_shared/helpers.ts';
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-const GEMINI_MODEL = 'gemini-2.5-flash-lite'; // fast + cheap for chat
-const GROQ_MODEL = 'openai/gpt-oss-120b';
-const TIMEOUT_MS = 20000;
+  const user = await getUser(req);
+  if (!user) return sendJson({ error: 'Please log in' }, 401);
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-const json = (o: unknown, s = 200) =>
-  new Response(JSON.stringify(o), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-// fetch with a deadline: a stalled provider fails over instead of hanging the assistant.
-async function fetchWithin(url: string, init: RequestInit, ms: number): Promise<Response> {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), ms);
-  try { return await fetch(url, { ...init, signal: ctl.signal }); }
-  finally { clearTimeout(timer); }
-}
-const stripThink = (t: string) => t.replace(/<think>[\s\S]*?<\/think>/g, '');
+  const body = await req.json();
+  const messages = body.messages || [];
 
-const SYSTEM = `You are Grange, a warm, plain-spoken grant advisor inside the Grange AI app.
-Your users are often small nonprofits who have NEVER applied for a grant. Explain like a patient mentor: short paragraphs, no jargon without a one-line definition, concrete next steps.
+  // Get the user's profile so the answers are about them
+  const supabase = getSupabase(req);
+  const profile = await supabase.from('onboarding_answers').select('answers').eq('user_id', user.id).single();
+  const answers = profile.data ? profile.data.answers : {};
 
-Hard rules:
-- Use the ORGANIZATION CONTEXT below to personalize. If a fact isn't there, ask for it rather than inventing it.
-- NEVER invent specific grant names, dollar amounts, or deadlines. For live opportunities tell the user to open the Discovery tab (which pulls real grants from Grants.gov) or check the funder's official site.
-- You assist; the user is always the author. For anything they'll submit, remind them to review and substantially revise — some funders (e.g. NIH) reject AI-written applications.
-- For "how do I not lose the money / clawback" questions: spend only within approved budget categories, keep every receipt, never miss a report deadline (2 CFR 200.403).
-- When a GRANT THE USER IS WORKING ON or RELEVANT PASSAGES from their past proposals appear below, use them to give specific, personalized answers in the user's own voice and words, not generic advice. Never invent facts that are not in the context.
-- Keep replies under ~180 words unless asked for more.`;
+  // Get their saved grants too
+  const grants = await supabase.from('grants').select('title, deadline').eq('user_id', user.id);
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  let prompt = 'You are a helpful grant writing assistant for small nonprofits.\n';
+  prompt += 'Keep answers short and simple.\n\n';
+  prompt += 'The user\'s organization: ' + JSON.stringify(answers) + '\n';
+  prompt += 'Their saved grants: ' + JSON.stringify(grants.data || []) + '\n\n';
+  prompt += 'Conversation:\n';
 
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
-
-  const sb = createClient(
-    Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
-  const { data: { user }, error: authErr } = await sb.auth.getUser();
-  if (authErr || !user) return json({ error: 'Unauthorized' }, 401);
-
-  let body: any;
-  try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
-  const message: string = (body?.message ?? '').toString().slice(0, 4000);
-  const history: Array<{ role: string; content: string }> = Array.isArray(body?.history) ? body.history.slice(-8) : [];
-  const grantCtx: string = (body?.grant_context ?? '').toString().slice(0, 1500);
-  if (!message.trim()) return json({ error: 'Empty message' }, 400);
-
-  // ── Ground the model in the user's real data (RLS keeps it their own) ──
-  let ctx = 'No organization profile yet — gently encourage the user to complete onboarding.';
-  try {
-    const [{ data: profile }, { data: deadlines }, { data: grants }] = await Promise.all([
-      sb.from('profiles').select('org_name,mission,ntee_code,focus_areas,service_geographies,annual_budget,staff_count,tax_exempt_status').eq('user_id', user.id).maybeSingle(),
-      sb.from('v_upcoming_deadlines').select('title,due_date,days_left').order('due_date').limit(5),
-      sb.from('grants').select('title,funder,status').eq('user_id', user.id).limit(8),
-    ]);
-    if (profile?.org_name || profile?.mission) {
-      const lines = [
-        `Organization: ${profile.org_name || '(unnamed)'}`,
-        profile.mission ? `Mission: ${profile.mission}` : '',
-        profile.focus_areas?.length ? `Focus areas: ${profile.focus_areas.join(', ')}` : '',
-        profile.service_geographies?.length ? `Serves: ${profile.service_geographies.join(', ')}` : '',
-        profile.tax_exempt_status ? `Tax status: ${profile.tax_exempt_status}` : '',
-        profile.annual_budget ? `Annual budget: $${profile.annual_budget}` : '',
-      ].filter(Boolean);
-      if (grants?.length) lines.push(`Grants in pipeline: ${grants.map((g: any) => `${g.title || g.funder} (${g.status})`).join('; ')}`);
-      if (deadlines?.length) lines.push(`Upcoming deadlines: ${deadlines.map((d: any) => `${d.title} in ${d.days_left} days`).join('; ')}`);
-      ctx = lines.join('\n');
-    }
-  } catch (_) { /* fall back to generic context */ }
-
-  // Best-effort retrieval from the user's OWN past proposals (key-free gte-small,
-  // RLS-scoped via match_document_chunks) so the assistant answers in their voice.
-  let ragText = '';
-  try {
-    const session = new (globalThis as any).Supabase.ai.Session('gte-small');
-    const emb = Array.from(await session.run(message, { mean_pool: true, normalize: true }));
-    const { data: chunks } = await sb.rpc('match_document_chunks', { query_embedding: JSON.stringify(emb), match_count: 3, filter_kind: 'past_proposal' });
-    const good = (chunks || []).filter((c: any) => (c.similarity ?? 0) >= 0.72).slice(0, 3);
-    if (good.length) ragText = "\n\n=== RELEVANT PASSAGES FROM THE USER'S OWN PAST PROPOSALS (use to answer in their voice; never invent) ===\n" + good.map((c: any, i: number) => `[${i + 1}] ${c.content}`).join('\n\n');
-  } catch (_) { /* best-effort; no past writing or model unavailable */ }
-
-  const fullPrompt = `${SYSTEM}\n\n=== ORGANIZATION CONTEXT ===\n${ctx}` +
-    (grantCtx ? `\n\n=== GRANT THE USER IS WORKING ON ===\n${grantCtx}` : '') +
-    ragText +
-    `\n\n=== CONVERSATION ===\n` +
-    history.map((h) => `${h.role === 'assistant' ? 'Grange' : 'User'}: ${h.content}`).join('\n') +
-    `\nUser: ${message}\nGrange:`;
-
-  // ── Gemini primary ──
-  const geminiKey = Deno.env.get('GEMINI_API_KEY');
-  if (geminiKey) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt) await new Promise((r) => setTimeout(r, 1200));
-      try {
-        const res = await fetchWithin(
-          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-              generationConfig: { temperature: 0.6, maxOutputTokens: 700, thinkingConfig: { thinkingBudget: 0 } } }) }, TIMEOUT_MS);
-        if (res.ok) {
-          const d = await res.json();
-          const reply = d?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
-          if (reply.trim()) return json({ reply: reply.trim(), model: GEMINI_MODEL });
-          break;
-        }
-        console.error('Gemini chat failed', res.status, await res.text().catch(() => ''));
-        if (![500, 503].includes(res.status)) break;   // a 429 quota error won't clear in a second
-      } catch (e) { console.error('Gemini chat threw or timed out', e); break; }
-    }
+  for (const msg of messages) {
+    prompt += msg.role + ': ' + msg.text + '\n';
   }
+  prompt += 'assistant:';
 
-  // ── Groq fallback ──
-  const groqKey = Deno.env.get('GROQ_API_KEY');
-  if (groqKey) {
-    try {
-      const res = await fetchWithin('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
-        // gpt-oss reasons before it answers, and those tokens count against the cap: leave room.
-        body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.6, max_completion_tokens: 1400, reasoning_effort: 'low',
-          messages: [{ role: 'system', content: SYSTEM + '\n\nORGANIZATION CONTEXT:\n' + ctx + (grantCtx ? '\n\nGRANT THE USER IS WORKING ON:\n' + grantCtx : '') + ragText },
-            ...history.map((h) => ({ role: h.role === 'assistant' ? 'assistant' : 'user', content: h.content })),
-            { role: 'user', content: message }] }) }, TIMEOUT_MS);
-      if (res.ok) {
-        const d = await res.json();
-        const reply = stripThink(d?.choices?.[0]?.message?.content ?? '');
-        if (reply.trim()) return json({ reply: reply.trim(), model: GROQ_MODEL });
-      } else { console.error('Groq chat failed', res.status, await res.text().catch(() => '')); }
-    } catch (e) { console.error('Groq chat threw', e); }
+  try {
+    const reply = await askAI(prompt, 'gemini-2.5-flash-lite');
+    return sendJson({ reply: reply });
+  } catch (err) {
+    console.log(err);
+    return sendJson({ error: 'The assistant is busy, try again.' }, 500);
   }
-
-  return json({ error: 'AI assistant unavailable. Set GEMINI_API_KEY (and optionally GROQ_API_KEY) in Edge Function secrets.' }, 502);
 });

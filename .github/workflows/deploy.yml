@@ -1,4 +1,4 @@
-name: Deploy to Cloudflare Pages
+name: Deploy website
 
 on:
   push:
@@ -9,10 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Wrangler
         run: npm install -g wrangler
-
       - name: Deploy to Cloudflare Pages
         run: wrangler pages deploy . --project-name grangeai-prototype --branch main
         env:

@@ -1,75 +1,57 @@
 # Grange AI
 
-**Grant help for organizations that can't afford a grant writer.** Grange AI finds the grants an
-organization actually qualifies for, checks whether it's ready to apply, drafts the proposal in the
-organization's own voice, and tracks deadlines and compliance after a win.
+Grange AI helps small nonprofits and community groups find grants and write proposals,
+even if they don't have a grant writer.
 
-Live at **[grangeai.net](https://grangeai.net)**.
+Live site: https://grangeai.net
 
-## The problem
+## Features
 
-Most small nonprofits, community groups and small businesses have no one whose job is finding and
-writing grants. Federal and foundation applications are long, eligibility rules are hard to read, and
-a missed registration (an EIN, a 501(c)(3) letter, a SAM.gov account) can sink an application before
-anyone reads it. Grange AI walks a first-time applicant through the whole process.
-
-## What it does
-
-| Step | What the user gets |
-|---|---|
-| **Profile** | A short survey (or a Form 990 upload) builds one organization profile that every later step reads from. Works for registered nonprofits, fiscal sponsees, businesses, governments and groups that haven't incorporated yet. |
-| **Discover** | Live federal opportunities from Grants.gov, filtered by the organization's type and focus areas, with a 0–100 match score; past federal awards to similar organizations from USASpending.gov; curated funders that don't require nonprofit status. |
-| **Prepare** | A readiness checklist (documents funders ask for), an IRS status check, a guided SAM.gov setup, and a step-by-step path for groups that want to become a nonprofit or use a fiscal sponsor. An AI read of a specific funder's call says whether to apply and what it requires. |
-| **Write** | A proposal generator that streams a full draft, grounded in the profile, a library of openly licensed winning proposals, and the user's own past proposals. Facts it couldn't confirm are highlighted for the user to check, and stay marked `[VERIFY: …]` in the Word, PDF and text exports. An editing pass strips generic "AI voice". |
-| **Manage** | Deadlines with staged reminders, and after an award: a compliance checklist and spending tracked against the budget. |
-
-An in-app assistant answers questions about the current screen, and a guided tour introduces each step.
+- **Profile** - a short survey about your organization
+- **Find Grants** - searches Grants.gov and gives each grant a match score
+- **Readiness** - a checklist of documents funders ask for, an IRS 501(c)(3) check, and SAM.gov reminders
+- **Write Proposal** - creates a first draft of a proposal using your profile
+- **Deadlines** - keeps track of due dates and exports them to your calendar
+- **Assistant** - a chatbot that answers grant questions
 
 ## How it's built
 
-- **Front end:** [`index.html`](index.html), a single-page app in plain HTML, CSS and JavaScript
-  (no framework, no build step), hosted on Cloudflare Pages. `three.js` drives the sign-in visuals.
-- **Back end:** [Supabase](https://supabase.com): Postgres with row-level security on every user
-  table, Auth (email/password, magic link, Google), Storage for uploaded documents, and Edge Functions
-  in TypeScript ([`supabase/functions/`](supabase/functions)). The browser only holds the public
-  publishable key; AI and API keys live in the functions.
-- **Data sources:** Grants.gov Search and Opportunity APIs, USASpending.gov, and ProPublica's Nonprofit
-  Explorer (IRS data), all called server-side.
-- **AI:** Google Gemini for drafting, scoring and the assistant. Drafting falls back to Groq
-  (`openai/gpt-oss-120b`) when Gemini is busy; the live drafting function is
-  [`supabase/live/generate-proposal.ts`](supabase/live/generate-proposal.ts). Retrieval uses `gte-small` embeddings in pgvector. [`grantbench/`](grantbench) is a
-  labeled evaluation suite for the scoring and judging prompts.
-- **Schema:** [`supabase/schema.sql`](supabase/schema.sql) and [`supabase/migrations/`](supabase/migrations).
-- [`app/`](app) and [`mobile/`](mobile) hold an earlier React/Vite build packaged for desktop (Electron)
-  and phones (Capacitor). The live site is `index.html`.
+- `index.html`, `style.css` and the `js/` folder are the website (plain HTML, CSS and JavaScript)
+- `supabase/` is the backend
+  - `schema.sql` has the database tables
+  - `functions/` has the edge functions that call Grants.gov, the IRS data, USASpending.gov, Stripe and the AI
+- `app/` is the desktop app (React + Electron)
+- `mobile/` is the phone app (React + Capacitor)
 
-## Run it locally
+## Running it
 
-```bash
-python3 -m http.server 3456      # then open http://localhost:3456
+Website:
+
+```
+python3 -m http.server 3456
 ```
 
-`config.js` points at the hosted Supabase project. To run against your own, follow
-[`SUPABASE_SETUP.md`](SUPABASE_SETUP.md).
+Then open http://localhost:3456
 
-## Tests
+Desktop app:
 
-[`qa/`](qa) runs the app in a headless browser against a fake Supabase backend, so it works offline and
-never touches real data:
-
-```bash
-cd qa && npm install
-node flows.mjs    # sign-up → tour → survey → dashboard, save a grant, draft a proposal, deadlines, readiness …
-node sweep.mjs    # every screen at desktop and phone widths: console errors, sideways scroll, screenshots
-node audit.mjs    # every inline handler calls a defined function; no duplicate or missing element ids
-node a11y.mjs     # axe-core WCAG 2 A/AA audit of every screen (`newuser`: each tour and survey step)
+```
+cd app
+npm install
+npm run dev
 ```
 
-[`qa/QA_LOG.md`](qa/QA_LOG.md) lists every bug found this way and the test that now covers it.
+Phone app:
 
-## Use of AI in building this project
+```
+cd mobile
+npm install
+npm run dev
+```
 
-Much of this codebase was written with **Claude Code**, Anthropic's AI coding assistant. Every commit
-it helped write carries a `Co-Authored-By: Claude` trailer in the git history (70 of the first 80
-commits), so the record of which changes involved AI is public and exact. The app itself also uses AI
-at runtime (Gemini and Groq, above) to draft and score proposals.
+## Setup
+
+1. Make a Supabase project and run `supabase/schema.sql` in the SQL editor.
+2. Copy `config.example.js` to `config.js` and fill in your Supabase URL and key.
+3. Add these secrets to Supabase: `GEMINI_API_KEY`, `GROQ_API_KEY`, `STRIPE_SECRET_KEY`.
+4. Deploy the functions with `supabase functions deploy`.

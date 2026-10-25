@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { useAuth } from './lib/auth'
+import { useState, useEffect } from 'react'
+import { supabase } from './lib/supabase'
 import TopBar from './components/TopBar'
 import TabBar from './components/TabBar'
 import Auth from './screens/Auth'
@@ -11,77 +11,51 @@ import Readiness from './screens/Readiness'
 import Chat from './screens/Chat'
 import Profile from './screens/Profile'
 
-const SCREENS = {
-  dashboard: Dashboard,
-  discovery: Discovery,
-  generator: Generator,
-  grants:    Grants,
-  readiness: Readiness,
-  chat:      Chat,
-  profile:   Profile,
+// Titles shown at the top of each screen
+const titles = {
+  dashboard: 'Home',
+  discovery: 'Find Grants',
+  grants: 'My Grants',
+  readiness: 'Readiness',
+  generator: 'Write',
+  chat: 'Assistant',
+  profile: 'Profile',
 }
-
-// Full-screen pages that manage their own chrome (no topbar/tabbar)
-const FULL_SCREEN = new Set(['chat'])
 
 export default function App() {
-  const { session, loading } = useAuth()
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [page, setPage] = useState('dashboard')
+  const [selectedGrant, setSelectedGrant] = useState(null)
 
-  // Lock body scroll for mobile
   useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    document.body.style.position = 'fixed'
-    document.body.style.width = '100%'
+    supabase.auth.getSession().then((result) => {
+      if (result.data.session) setUser(result.data.session.user)
+      setLoading(false)
+    })
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session ? session.user : null)
+    })
   }, [])
 
-  if (loading) return <Splash />
-  if (!session) return <Auth />
+  if (loading) return <div className="center">Loading...</div>
+  if (!user) return <Auth />
 
-  const Screen = SCREENS[page] || Dashboard
-  const isFullScreen = FULL_SCREEN.has(page)
-
-  if (isFullScreen) {
-    return (
-      <div className="app-shell">
-        <Screen setPage={setPage} />
-      </div>
-    )
-  }
+  let screen
+  if (page === 'dashboard') screen = <Dashboard user={user} setPage={setPage} />
+  else if (page === 'discovery') screen = <Discovery user={user} setPage={setPage} setSelectedGrant={setSelectedGrant} />
+  else if (page === 'generator') screen = <Generator user={user} grant={selectedGrant} />
+  else if (page === 'grants') screen = <Grants user={user} />
+  else if (page === 'readiness') screen = <Readiness user={user} />
+  else if (page === 'chat') screen = <Chat />
+  else if (page === 'profile') screen = <Profile user={user} />
 
   return (
-    <div className="app-shell">
-      <TopBar page={page} onAction={action => {
-        if (action === 'chat') setPage('chat')
-      }} />
-      <Screen setPage={setPage} />
+    <div className="phone">
+      <TopBar title={titles[page]} setPage={setPage} />
+      <main className="main">{screen}</main>
       <TabBar page={page} setPage={setPage} />
-    </div>
-  )
-}
-
-function Splash() {
-  return (
-    <div style={{
-      height: '100dvh',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg-base)', gap: 20,
-    }}>
-      <div style={{
-        width: 72, height: 72, background: 'var(--accent)', borderRadius: 22,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 34, fontWeight: 800, color: 'white',
-        boxShadow: '0 6px 28px var(--accent-glow)',
-        animation: 'pulse 1.5s ease-in-out infinite',
-      }}>G</div>
-      <span style={{ color: 'var(--ink-tertiary)', fontSize: 14, fontFamily: 'var(--font)' }}>Loading…</span>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 6px 28px rgba(232,92,58,0.4); }
-          50%       { transform: scale(1.05); box-shadow: 0 8px 36px rgba(232,92,58,0.65); }
-        }
-      `}</style>
     </div>
   )
 }
