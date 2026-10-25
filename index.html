@@ -7054,6 +7054,10 @@ function buildPrompt(fields, org, grant) {
   const focusAreas = org.focusAreas  || '';
   const benefic    = org.beneficiaries || fields.population || 'community members';
   const programs   = org.programs    || '';
+  // A recently founded org, or one that serves nobody yet, has no track record to cite.
+  const _yr = parseInt(org.yearFounded, 10);
+  const _served = parseInt(String(org.peopleServed || '').replace(/[^\d]/g, ''), 10);
+  const isNewOrg = (_yr && _yr >= new Date().getFullYear() - 1) || _served === 0;
 
   /* ── Funder-type-specific reviewer notes ────────────────── */
   const funderTypeGuide = {
@@ -7087,7 +7091,7 @@ ORGANIZATION:
 - ${staff}${served ? ' · ' + served : ''}
 - Focus areas: ${focusAreas}
 - Who we serve: ${benefic}
-- Primary programs: ${programs}
+- Primary programs: ${programs}${isNewOrg ? '\n- Stage: a new organization that has not yet built a track record. Write it as one: describe what it has and what it will do, never past results it does not have.' : ''}
 
 PROGRAM BEING FUNDED:
 - Program name: ${fields.program}
@@ -7112,6 +7116,8 @@ RULES (follow exactly):
 - Write in first-person plural as the organization ("we", "our", "us").
 - Use ONLY the data provided. If a field says "Not specified", work around it. Do not invent statistics, staff names, program details, or dollar figures not given.
 - ABSOLUTE RULE, NO FABRICATION: every concrete fact, number, dollar figure, date, percentage, name, statistic, or outcome in the proposal MUST come from the ORGANIZATION data above or from the VERIFIED DETAILS THE ORGANIZATION PROVIDED (below, if present). You may NOT invent, estimate, guess, approximate, or "reasonably assume" any factual detail, not even a plausible-sounding one. If the proposal needs a specific detail that was not provided, do NOT write a number or fact there. Instead write the sentence and insert a marker exactly like [VERIFY: what is needed] at that spot. A [VERIFY] marker is always better than a statement that might be untrue. The VERIFIED DETAILS, when present, are true facts from the applicant: use them directly and accurately.
+- NO UNSUPPORTED CAPACITY CLAIMS: do not claim a track record, past results, partnerships, staff or volunteer credentials, facilities, years of experience, or a funding base unless the data above states it. Phrases like "proven track record", "strong partnerships", "experienced team", "professional staff" and "diverse funding base" are claims and need that data. Where capacity is thin, say plainly what the organization has and plans, and put [VERIFY: what to add] where a real detail belongs.
+- PLACEHOLDERS: every missing detail uses exactly this form: [VERIFY: what to add]. Never write [Neighborhood Name], [Insert ...], XX, ___ or any other blank.
 - Do not pad. Every sentence must earn its place.
 - Never use em dashes. Write with commas, periods, or colons instead. Avoid stock AI phrasing and rhetorical "not X, but Y" constructions.
 - WRITE LIKE A HUMAN, not an AI. Reviewers read hundreds of proposals and can smell machine-written prose; it costs you credibility. Follow these hard voice rules:
@@ -7133,7 +7139,7 @@ RULES (follow exactly):
       const lim = Number(s.word_limit) ? ` (no more than ${Number(s.word_limit)} words)` : '';
       return `<h4>${s.title}</h4>\n${s.description || 'Write this section, grounded in the organization data.'}${lim}`;
     }).join('\n\n');
-    return `You are a senior ${writerRole}grant writer with 15 years of experience winning competitive awards. Write a complete proposal using EXACTLY the funder's required sections below, in this order, with the exact <h4> titles. Respect every stated word limit.
+    return `You are a senior ${writerRole}grant writer with 15 years of experience winning competitive awards. Write a complete proposal using EXACTLY the funder's required sections below, in this order, with the exact <h4> titles. Write every one of them, including any summary sheet or cover page; do not skip, merge or rename a section. Respect every stated word limit.
 
 ${sharedContext}
 
@@ -7172,7 +7178,7 @@ List 3–4 SMART objectives. Each objective must specify: (a) what will change, 
 Describe how you will know if it worked. Specify: (1) what data you will collect (participant surveys, attendance records, pre/post assessments, etc.), (2) who collects it and how often, (3) how you will use findings to improve the program. If you have a learning partner or external evaluator, mention it. (~150 words)
 
 <h4>Organizational Capacity</h4>
-Establish credibility without bragging. Cite track record with similar programs, relevant partnerships, key staff qualifications (roles, not names), and any prior grants successfully managed. Close with one sentence on long-term sustainability of this program beyond the grant period. (~150 words)`;
+Establish credibility without bragging, using only capacity facts in the data above: staff, years operating, people served, programs, partners, prior grants. If the data shows little or none, write as a new organization: who leads it and what they bring (only if given), the plan, and first steps, with [VERIFY: ...] for any capacity detail the organization should add. Close with one sentence on how the program continues after the grant period. (~150 words)`;
   }
 
   /* ── Letter of Inquiry (LOI) ──────────────────────────── */
@@ -7189,7 +7195,7 @@ Paragraph 2 — THE NEED: Make the case for why this problem is urgent and under
 
 Paragraph 3 — YOUR SOLUTION: Describe what you will do, for whom, and the primary outcome you expect. Keep it high-level — 4–6 sentences. This is not the place for a full logic model; it is the place to make the approach sound credible and distinct.
 
-Paragraph 4 — WHY US: Establish credibility in 3–4 sentences. Reference your track record, relevant past outcomes, key partnerships, or years serving this population. Be specific — one concrete number (people served, grant managed, year founded) is worth three adjectives.
+Paragraph 4 — WHY US: Establish credibility in 3–4 sentences, using only what the data above shows: past outcomes, partnerships, or years serving this population. Be specific: one concrete number (people served, grant managed, year founded) is worth three adjectives. If the organization is new, say what it brings and plans instead of implying a record it does not have.
 
 Paragraph 5 — CLOSE: Express genuine alignment with the funder's mission (specific, not generic). State next steps: that you welcome the opportunity to submit a full proposal or speak with program staff. Thank them by organization name, not "the funder."`;
   }
@@ -7212,7 +7218,7 @@ Describe the solution concept at a high level — what you would do, with whom, 
 What would success look like? Identify 2–3 headline outcomes you expect to achieve in the grant period, expressed as changes for the target population. Keep them ambitious but credible given your org's scale. (~100 words)
 
 <h4>Organizational Fit</h4>
-Why is your organization the right entity to do this? Connect your mission, track record, community relationships, and existing infrastructure to this specific program concept. (~120 words)
+Why is your organization the right entity to do this? Connect your mission and whatever the data shows of your record, community relationships and infrastructure to this program concept. If the organization is new, say so and describe what it brings. (~120 words)
 
 <h4>Funding Request & Next Steps</h4>
 State the approximate amount you would request for a full proposal, the project period, and what a full proposal would include. Invite the funder's input and express openness to refining the concept based on their priorities. (~80 words)`;
@@ -8291,6 +8297,7 @@ async function generate() {
     const decoder = new TextDecoder();
     let buffer = '';
     let rawText = '';
+    let streamErr = '';
     const genStart = Date.now();
 
     while (true) {
@@ -8307,6 +8314,7 @@ async function generate() {
         if (!jsonStr || jsonStr === '[DONE]') continue;
         try {
           const chunk = JSON.parse(jsonStr);
+          if (chunk?.error) { streamErr = chunk.error.message || 'error'; continue; }   // the AI service failed mid-stream
           const text  = chunk?.candidates?.[0]?.content?.parts?.[0]?.text || '';
           if (text) {
             rawText += text;
@@ -8324,6 +8332,13 @@ async function generate() {
       }
     }
 
+    // An empty answer (the AI service was overloaded, or stopped early) is a failure, not a draft:
+    // never score, save or announce a blank document.
+    if (rawText.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().length < 200) {
+      content.innerHTML = '';
+      if (streamErr) console.warn('[Grange AI] stream error:', streamErr);
+      throw new Error('The AI writer sent back an empty draft. That usually clears in a minute. Please try again.');
+    }
     if (window._apCtl && window._apCtl.finish) window._apCtl.finish();
     genSetStep(4);                            // → step 4: Review & export
     renderSectionMap(fields);                 // why each funder section is here (rationale)
@@ -8424,6 +8439,10 @@ function showAIPolicyBanner(grant) {
 function flagVerifyMarkers(contentEl) {
   if (!contentEl) return 0;
   let count = 0;
+  // Template blanks the writer left anyway ("[Neighborhood Name]", "[Insert number of students]")
+  // become VERIFY spots, so they are highlighted and kept in exports instead of reading as finished text.
+  contentEl.innerHTML = contentEl.innerHTML.replace(/\[((?:Insert|Add|Enter|Your)\b[^\]<\n]{0,50}|[^\]<\n]{0,40}\b(?:Name|Names|Number|Date|Dates|Amount|Neighborhood|City|County|School|Partner|Percentage|Statistic|Figure|Title)\b[^\]<\n]{0,20})\]/g,
+    (m, inner) => /^\s*VERIFY:/i.test(inner) ? m : '[VERIFY: ' + inner.trim() + ']');
   contentEl.innerHTML = contentEl.innerHTML.replace(/\[VERIFY:\s*([^\]]+)\]/gi, function (_, what) {
     count++;
     const tt = document.createElement('template'); tt.innerHTML = what;   // decode entities / drop tags, then escape once

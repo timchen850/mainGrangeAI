@@ -25,7 +25,7 @@ async function sendEmail(userId: string, emailType: string, data: Record<string,
 }
 
 const GEMINI_MODEL = 'gemini-2.5-flash'; // current, free-tier eligible, strong prose
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'openai/gpt-oss-120b';   // llama-3.3-70b-versatile was shut down on Aug 16 2026
 
 // Monthly draft limits per tier, as the plan cards state them (Pro = no cap).
 const TIER_DRAFTS: Record<string, number> = { free: 2, starter: 15, pro: Infinity };
@@ -150,7 +150,9 @@ Deno.serve(async (req: Request) => {
           model: GROQ_MODEL,
           stream: true,
           temperature: body?.generationConfig?.temperature ?? 0.7,
-          max_tokens: body?.generationConfig?.maxOutputTokens ?? 2048,
+          // gpt-oss reasons before it answers, and those tokens count against this cap: leave room.
+          max_completion_tokens: (body?.generationConfig?.maxOutputTokens ?? 2048) + 2048,
+          reasoning_effort: 'low',
           messages: [{ role: 'user', content: prompt }],
         }),
       });

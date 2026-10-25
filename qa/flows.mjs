@@ -276,6 +276,39 @@ flow('draft-daily-limit-message', async (browser, check) => {
   return t;
 });
 
+// Tim's test take, Oct 25: Gemini answered "high demand" and the generator showed "Draft ready" over a blank page.
+flow('empty-draft-is-an-error', async (browser, check) => {
+  const t = await openApp(browser, { persona: 'np', draftText: '<p> </p>' });
+  const p = t.page; const toasts = await toastSpy(p);
+  await p.evaluate(() => go('generator')); await p.waitForTimeout(800);
+  await p.evaluate(() => { const s = (window._genPipeline || [])[0]; if (s) pickSaved(s.id); }); await p.waitForTimeout(800);
+  await fillGenForm(p); await p.click('#gen-btn'); await approvePlanIfShown(p); await p.waitForTimeout(4000);
+  check('an empty answer says so and asks to try again', toasts.some((m) => /sent back an empty draft/.test(m)));
+  check('and never says "Draft ready" or shows a blank document', !toasts.some((m) => /Draft ready/.test(m)) && await p.evaluate(() => document.getElementById('out-doc').style.display !== 'block'));
+  check('the form is back so the user can try again', await p.isVisible('#gen-btn'));
+  return t;
+});
+
+flow('draft-honesty-rules-and-blanks', async (browser, check) => {
+  const DRAFT = '<h4>Organizational Capacity</h4><p>We serve families in [Neighborhood Name] and will enroll [Insert number of students] students, as noted [1].</p>' + '<p>' + 'Our program meets weekly with trained mentors. '.repeat(12) + '</p>';
+  const t = await openApp(browser, { persona: 'np', draftText: DRAFT });
+  const p = t.page;
+  const prompts = [];
+  p.on('request', (q) => { if (q.url().includes('/functions/v1/generate-proposal')) prompts.push(q.postData() || ''); });
+  await p.evaluate(() => { window._grange._cachedAnswers.year_founded = String(new Date().getFullYear()); });
+  await p.evaluate(() => go('generator')); await p.waitForTimeout(800);
+  await p.evaluate(() => { const s = (window._genPipeline || [])[0]; if (s) pickSaved(s.id); }); await p.waitForTimeout(800);
+  await fillGenForm(p); await p.click('#gen-btn'); await approvePlanIfShown(p); await p.waitForTimeout(7000);
+  const draftPrompt = prompts.find((x) => /NO UNSUPPORTED CAPACITY CLAIMS/.test(x)) || '';
+  check('the writer is told not to claim a track record, partners or funding the data lacks', /proven track record/.test(draftPrompt) && /diverse funding base/.test(draftPrompt));
+  check('an org founded this year is described to the writer as new', /Stage: a new organization/.test(draftPrompt));
+  check('the writer is told to use only [VERIFY: ...] for blanks', /Never write \[Neighborhood Name\]/.test(draftPrompt));
+  const marks = await p.evaluate(() => [...document.querySelectorAll('#out-doc mark.verify-flag')].map((m) => m.textContent));
+  check('leftover blanks become highlighted VERIFY spots ("Neighborhood Name", "Insert number of students")', marks.includes('Neighborhood Name') && marks.includes('Insert number of students'));
+  check('a footnote like [1] is left alone', await p.evaluate(() => /\[1\]/.test(document.getElementById('out-doc').textContent)));
+  return t;
+});
+
 flow('save-failures-are-visible', async (browser, check) => {
   const t = await openApp(browser, { persona: 'np', failTables: ['readiness_items'] });
   const p = t.page;

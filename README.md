@@ -35,8 +35,9 @@ An in-app assistant answers questions about the current screen, and a guided tou
   publishable key; AI and API keys live in the functions.
 - **Data sources:** Grants.gov Search and Opportunity APIs, USASpending.gov, and ProPublica's Nonprofit
   Explorer (IRS data), all called server-side.
-- **AI:** Google Gemini for drafting, scoring and the assistant, with Groq (Llama 3.3 70B) as the
-  fallback. Retrieval uses `gte-small` embeddings in pgvector. [`grantbench/`](grantbench) is a
+- **AI:** Google Gemini for drafting, scoring and the assistant. Drafting falls back to Groq
+  (`openai/gpt-oss-120b`) when Gemini is busy; the live drafting function is
+  [`supabase/live/generate-proposal.ts`](supabase/live/generate-proposal.ts). Retrieval uses `gte-small` embeddings in pgvector. [`grantbench/`](grantbench) is a
   labeled evaluation suite for the scoring and judging prompts.
 - **Schema:** [`supabase/schema.sql`](supabase/schema.sql) and [`supabase/migrations/`](supabase/migrations).
 - [`app/`](app) and [`mobile/`](mobile) hold an earlier React/Vite build packaged for desktop (Electron)
