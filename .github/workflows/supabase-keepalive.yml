@@ -1,9 +1,11 @@
 name: Supabase keep-alive
 
-# Free-tier Supabase projects pause after about a week without activity, and a
-# paused project takes grangeai.net's login, drafting and discovery down (this
-# happened in October 2026). Twice a week this makes one real database read
-# through the public REST API so the project never looks idle.
+# Free-tier Supabase projects pause after a week of low database activity, and a
+# paused project takes grangeai.net's login, drafting and discovery down (it
+# happened in October and again in early November 2026). Supabase says "a few
+# requests to the database each day" keeps a project awake; a read twice a week
+# was not enough (it paused ~Nov 1 although the Oct 26 and 29 reads succeeded).
+# So this makes one real database read through the public REST API three times a day.
 #
 # It uses only the publishable key that config.js already ships to every
 # browser; Row Level Security returns no rows to it. If the project has paused
@@ -13,7 +15,7 @@ name: Supabase keep-alive
 
 on:
   schedule:
-    - cron: '17 15 * * 1,4'   # Mondays and Thursdays, 15:17 UTC
+    - cron: '17 3,11,19 * * *'   # every day at 03:17, 11:17 and 19:17 UTC
   workflow_dispatch:
   push:
     paths: ['.github/workflows/supabase-keepalive.yml']   # test run when this file changes
