@@ -11,9 +11,9 @@
 //   USASpending recipient_type_names, empirically validated. Auth: own (verify_jwt=false).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsonFor } from '../_shared/cors.ts';
+import { bumpRateLimit, rateLimitMessage } from '../_shared/ratelimit.ts';
 
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 const GRANT_CODES = ['02', '03', '04', '05']; // block / formula / project grant / cooperative agreement
 const FIELDS = ['Award ID', 'Recipient Name', 'Award Amount', 'Awarding Agency', 'Awarding Sub Agency', 'Start Date', 'End Date', 'Description'];
@@ -27,12 +27,16 @@ function median(nums: number[]): number {
 function yearOf(d: string): string { const m = /^(\d{4})/.exec((d || '').toString()); return m ? m[1] : ''; }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  const { json, preflight } = jsonFor(req);
+  if (req.method === 'OPTIONS') return preflight();
   const auth = req.headers.get('Authorization');
   if (!auth?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
   const { data: { user }, error: aerr } = await sb.auth.getUser();
   if (aerr || !user) return json({ error: 'Unauthorized' }, 401);
+
+  const rl = await bumpRateLimit('usaspending-search', user.id, 30, 3600);
+  if (!rl.allowed) return json({ error: rateLimitMessage('funding-history searches', rl) }, 429);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }

@@ -1,0 +1,34 @@
+# Supabase CLI project config. Only the settings that differ from the defaults are listed.
+project_id = "xewrvmqyzeiziimcmenj"
+
+# Stripe signs its webhook calls but sends no Supabase token, so the gateway's JWT check must be
+# off for this one function; the function verifies the Stripe signature itself.
+[functions.stripe-webhook]
+verify_jwt = false
+
+# Every other function checks the user's token itself (sb.auth.getUser), so the gateway check is
+# redundant; they are deployed with verify_jwt = false today and this keeps the CLI in step.
+[functions.generate-proposal]
+verify_jwt = false
+[functions.ai-chat]
+verify_jwt = false
+[functions.ai-worker]
+verify_jwt = false
+[functions.discover-grants]
+verify_jwt = false
+[functions.grant-detail]
+verify_jwt = false
+[functions.irs-verify]
+verify_jwt = false
+[functions.rag-ingest]
+verify_jwt = false
+[functions.rag-search]
+verify_jwt = false
+[functions.usaspending-search]
+verify_jwt = false
+[functions.exemplar-ingest]
+verify_jwt = false
+[functions.exemplar-search]
+verify_jwt = false
+[functions.delete-account]
+verify_jwt = false

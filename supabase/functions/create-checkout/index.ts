@@ -1,20 +1,22 @@
 // Grange AI — Stripe Checkout session creator
-// Called from the Pricing page when a user clicks "Start Free Trial".
+// Called from the Plans screen when a signed-in user picks Starter or Pro.
 // Creates a Stripe Checkout session and returns the URL to redirect to.
+//
+// There is NO free trial: the plan cards say "no card required" for the Free plan, and a paid plan
+// is charged at once. Do not add trial_period_days here without changing the Terms and the cards.
 //
 // Secrets required (set via: supabase secrets set KEY=value):
 //   STRIPE_SECRET_KEY   — from Stripe dashboard
 // Auto-injected: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+//
+// Open paid plans with: supabase secrets set PAID_PLANS_OPEN=true  (until then this returns 503 and
+// the app shows "Paid plans aren't open yet").
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsonFor } from '../_shared/cors.ts';
+import { bumpRateLimit, rateLimitMessage } from '../_shared/ratelimit.ts';
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-const json = (o: unknown, s = 200) =>
-  new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
+const SITE_URL = 'https://grangeai.net';
 
 // Stripe price lookup keys → created on first use if missing.
 // Prices changed 2026-10-24 (Starter $14.99/mo or $120/yr, Pro $35.99/mo or $300/yr). Stripe prices
@@ -63,8 +65,13 @@ async function getOrCreatePrice(lookupKey: string): Promise<string> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  const { json, preflight } = jsonFor(req);
+  if (req.method === 'OPTIONS') return preflight();
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+  if ((Deno.env.get('PAID_PLANS_OPEN') || '').toLowerCase() !== 'true') {
+    return json({ error: 'Paid plans aren’t open yet. You’re on the Free plan for now.', code: 'plans_closed' }, 503);
+  }
 
   try {
     // Auth: require logged-in user
@@ -76,6 +83,9 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authErr || !user) return json({ error: 'Unauthorized' }, 401);
 
+    const rl = await bumpRateLimit('create-checkout', user.id, 10, 3600);
+    if (!rl.allowed) return json({ error: rateLimitMessage('starting checkout', rl) }, 429);
+
     const { tier, billing } = await req.json();
     if (!['starter', 'pro'].includes(tier)) return json({ error: 'Invalid tier' }, 400);
     if (!['monthly', 'annual'].includes(billing)) return json({ error: 'Invalid billing' }, 400);
@@ -83,8 +93,12 @@ Deno.serve(async (req) => {
     const lookupKey = `${tier}_${billing}_v2`;
     const priceId = await getOrCreatePrice(lookupKey);
 
-    // App URL for redirects (works locally and in prod)
-    const origin = req.headers.get('origin') ?? 'https://grangeai.com';
+    // Redirect back to the page that started checkout. Only Grange's own origins are trusted;
+    // anything else (or no Origin header) goes to the live site. The old fallback was grangeai.com,
+    // a domain Grange does not own.
+    const reqOrigin = req.headers.get('origin') ?? '';
+    const origin = /^https:\/\/(www\.)?grangeai\.net$|^https:\/\/([a-z0-9-]+\.)?grangeai-prototype\.pages\.dev$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(reqOrigin)
+      ? reqOrigin : SITE_URL;
 
     const session = await stripe('/checkout/sessions', {
       mode: 'subscription',
@@ -97,6 +111,7 @@ Deno.serve(async (req) => {
       'metadata[tier]': tier,
       'subscription_data[metadata][user_id]': user.id,
       'subscription_data[metadata][tier]': tier,
+      client_reference_id: user.id,
       allow_promotion_codes: 'true',
       'billing_address_collection': 'auto',
     });

@@ -3,12 +3,19 @@
 // built-in key-free Supabase Edge Runtime 'gte-small' model (384-dim), and stores
 // the chunks (RLS-scoped to the user) so the writer can later ground drafts in
 // the org's own voice. NO external API key, NO training on user data.
-// Body: { text: string, label?: string, kind?: string, file_name?: string }
+// Body: { text: string, label?: string, kind?: string, file_name?: string,
+//         document_id?: uuid, chunk_offset?: number }
+//
+// Nov 15 2026: one call used to embed up to 80 chunks (≈88,000 characters) one at a time, which
+// is past the edge worker's compute limit (exemplar-ingest learned this at 8). A call now takes at
+// most MAX_CHUNKS_PER_CALL chunks and answers 413 with `next_offset` when the text is longer; the
+// app sends the rest in follow-up calls with document_id + chunk_offset, so a 15-page proposal
+// lands as ONE document. Per-user rate limit through bump_rate_limit (20 calls an hour).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsonFor } from '../_shared/cors.ts';
+import { bumpRateLimit, rateLimitMessage } from '../_shared/ratelimit.ts';
 
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 // Split text into overlapping chunks on natural (paragraph) boundaries.
 function chunkText(text: string, size = 1100, overlap = 150): string[] {
@@ -29,16 +36,21 @@ function chunkText(text: string, size = 1100, overlap = 150): string[] {
     buf = buf ? buf + '\n\n' + p : p;
   }
   if (buf) chunks.push(buf);
-  return chunks.slice(0, 80); // safety cap per document
+  return chunks.slice(0, 400); // hard cap per document (≈ 440,000 characters)
 }
+const MAX_CHUNKS_PER_CALL = 24;   // ≈ 26,000 characters: stays inside the worker's compute budget
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  const { json, preflight } = jsonFor(req);
+  if (req.method === 'OPTIONS') return preflight();
   const auth = req.headers.get('Authorization');
   if (!auth?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
   const { data: { user }, error: aerr } = await sb.auth.getUser();
   if (aerr || !user) return json({ error: 'Unauthorized' }, 401);
+
+  const rl = await bumpRateLimit('rag-ingest', user.id, 20, 3600);
+  if (!rl.allowed) return json({ error: rateLimitMessage('uploads', rl) }, 429);
 
   // RAG is a Pro-only feature
   const sbAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -54,33 +66,45 @@ Deno.serve(async (req: Request) => {
   const fileName = body?.file_name ? String(body.file_name).slice(0, 200) : null;
   if (text.trim().length < 80) return json({ error: 'Please add at least a paragraph of text.' }, 400);
 
-  const chunks = chunkText(text);
-  if (!chunks.length) return json({ error: 'No usable text found.' }, 400);
+  const allChunks = chunkText(text);
+  if (!allChunks.length) return json({ error: 'No usable text found.' }, 400);
+  const offset = Math.max(0, Math.min(allChunks.length, Math.trunc(Number(body?.chunk_offset) || 0)));
+  const existingDocId = body?.document_id ? String(body.document_id) : null;
+  if (offset > 0 && !existingDocId) return json({ error: 'chunk_offset needs document_id.' }, 400);
+  const chunks = allChunks.slice(offset, offset + MAX_CHUNKS_PER_CALL);
+  const nextOffset = offset + chunks.length < allChunks.length ? offset + chunks.length : null;
 
   // built-in, key-free embedder (runs locally in the edge runtime)
   let session: any;
   try { session = new (globalThis as any).Supabase.ai.Session('gte-small'); }
   catch (e) { return json({ error: 'Embedding model unavailable: ' + (e instanceof Error ? e.message : String(e)) }, 502); }
 
-  // record the source document first
-  const { data: doc, error: derr } = await sb.from('documents')
-    .insert({ user_id: user.id, kind, label, file_name: fileName, mime_type: 'text/plain', size_bytes: text.length, extracted: true })
-    .select('id').single();
-  if (derr || !doc) return json({ error: 'Could not save the document: ' + (derr?.message || '') }, 500);
+  // record the source document first (or append to one from an earlier call: RLS makes sure it is the user's own)
+  let docId = existingDocId;
+  if (!docId) {
+    const { data: doc, error: derr } = await sb.from('documents')
+      .insert({ user_id: user.id, kind, label, file_name: fileName, mime_type: 'text/plain', size_bytes: text.length, extracted: true })
+      .select('id').single();
+    if (derr || !doc) return json({ error: 'Could not save the document: ' + (derr?.message || '') }, 500);
+    docId = doc.id;
+  } else {
+    const { data: own } = await sb.from('documents').select('id').eq('id', docId).maybeSingle();
+    if (!own) return json({ error: 'Document not found.' }, 404);
+  }
 
   try {
     const rows: any[] = [];
     for (let i = 0; i < chunks.length; i++) {
       const emb = await session.run(chunks[i], { mean_pool: true, normalize: true });
-      rows.push({ user_id: user.id, document_id: doc.id, source_kind: kind, chunk_index: i, content: chunks[i], embedding: JSON.stringify(Array.from(emb)), token_count: Math.round(chunks[i].length / 4) });
+      rows.push({ user_id: user.id, document_id: docId, source_kind: kind, chunk_index: offset + i, content: chunks[i], embedding: JSON.stringify(Array.from(emb)), token_count: Math.round(chunks[i].length / 4) });
     }
     const { error: cerr } = await sb.from('document_chunks').insert(rows);
     if (cerr) throw new Error(cerr.message);
-    return json({ ok: true, document_id: doc.id, label, chunks: rows.length });
+    return json({ ok: true, document_id: docId, label, chunks: offset + rows.length, total_chunks: allChunks.length, next_offset: nextOffset });
   } catch (e) {
-    // roll back the orphan document row if embedding/storing failed
-    await sb.from('document_chunks').delete().eq('document_id', doc.id);
-    await sb.from('documents').delete().eq('id', doc.id);
+    // roll back everything for this document if embedding/storing failed
+    await sb.from('document_chunks').delete().eq('document_id', docId);
+    await sb.from('documents').delete().eq('id', docId);
     return json({ error: 'Could not store embeddings: ' + (e instanceof Error ? e.message : String(e)) }, 500);
   }
 });

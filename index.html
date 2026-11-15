@@ -7,6 +7,7 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Grange AI - The grants you need, written for you</title>
 <meta name="description" content="Grange AI finds the grants your organization qualifies for, checks that you're ready to apply, and drafts the proposal in your own voice. Built for groups without a grant writer.">
+<link rel="canonical" href="https://grangeai.net/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://grangeai.net/">
 <meta property="og:title" content="Grange AI: the grants you qualify for, found for you">
@@ -29,6 +30,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
 <style>
+/* Keyboard users: the first Tab stop jumps past the navigation (hidden until focused). */
+.skip-link { position:absolute; left:16px; top:-100px; z-index:10000; background:#1b1a17; color:#fff; padding:10px 16px; border-radius:8px; font:600 14px/1.2 system-ui, sans-serif; text-decoration:none; }
+.skip-link:focus { top:12px; outline:3px solid #d94f30; outline-offset:2px; }
+/* inline form error lines (sign-in, generator) */
+.field-err { display:none; margin-top:8px; font-size:13px; color:#b4371c; line-height:1.4; }
+.field-err.on { display:block; }
 /* ═══════════════════════════════════════════════════════════
    GRANGE AI - design tokens
    Light theme, locked. One accent (warm vermilion from brand
@@ -2461,6 +2468,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
     document.documentElement.classList.add('js');
   }
 </script>
+<a class="skip-link" href="#" onclick="skipToMain();return false;">Skip to main content</a>
 
 <!-- ════════════════════════ LANDING ════════════════════════ -->
 <div id="landing" class="screen active">
@@ -2548,14 +2556,14 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
               <!-- Phase 1: Scanning databases -->
               <div class="demo-ph" id="dph-scan">
                 <div class="demo-ph-top">
-                  <span class="demo-ph-label">Scanning grant databases</span>
+                  <span class="demo-ph-label">Scanning grant databases <span style="font-weight:500;opacity:.7">· sample</span></span>
                   <span class="demo-spinner"></span>
                 </div>
                 <div class="demo-prog-track"><div class="demo-prog-bar" id="demo-prog"></div></div>
                 <div class="demo-scan-lines">
                   <div class="demo-sl">✓ Grants.gov: 1,247 open opportunities</div>
                   <div class="demo-sl">✓ USASpending.gov: 312 past awards</div>
-                  <div class="demo-sl">✓ Vetted foundations: Kellogg, RWJF and more</div>
+                  <div class="demo-sl">✓ Curated funders: 9 checked</div>
                   <div class="demo-sl">✓ Eligibility rules checked for each one</div>
                   <div class="demo-sl" style="color:#d94f30;font-weight:600">→ Scoring against your profile...</div>
                 </div>
@@ -2563,13 +2571,13 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
               <!-- Phase 2: Match results -->
               <div class="demo-ph hidden" id="dph-match">
                 <div class="demo-ph-top">
-                  <span class="demo-ph-label">12 new matches this week</span>
+                  <span class="demo-ph-label">Your top matches <span style="font-weight:500;opacity:.7">· sample</span></span>
                 </div>
                 <div class="demo-grants">
-                  <div class="demo-gr" id="dgr-1"><span class="demo-score hi">94%</span><div class="demo-gr-body"><div class="demo-gr-name">DHHS Healthy Communities Initiative</div><div class="demo-gr-meta">Federal · $250,000 · Due Jun 15</div></div><span class="demo-draft-btn">Draft →</span></div>
-                  <div class="demo-gr" id="dgr-2"><span class="demo-score hi">91%</span><div class="demo-gr-body"><div class="demo-gr-name">Robert Wood Johnson Foundation</div><div class="demo-gr-meta">Foundation · $200K–$500K · Open calls vary</div></div><span class="demo-draft-btn">Draft →</span></div>
-                  <div class="demo-gr" id="dgr-3"><span class="demo-score hi">88%</span><div class="demo-gr-body"><div class="demo-gr-name">W.K. Kellogg Foundation, Community Healing</div><div class="demo-gr-meta">Foundation · $150K–$600K · LOI any time</div></div><span class="demo-draft-btn">Draft →</span></div>
-                  <div class="demo-gr" id="dgr-4"><span class="demo-score mid">76%</span><div class="demo-gr-body"><div class="demo-gr-name">California Community Foundation</div><div class="demo-gr-meta">Foundation · $50K–$100K · Rolling</div></div><span class="demo-draft-btn">Draft →</span></div>
+                  <div class="demo-gr" id="dgr-1"><span class="demo-score hi">94%</span><div class="demo-gr-body"><div class="demo-gr-name">DHHS Healthy Communities Initiative</div><div class="demo-gr-meta">Federal · $250,000 · Due in 14 days</div></div><span class="demo-draft-btn">Draft →</span></div>
+                  <div class="demo-gr" id="dgr-2"><span class="demo-score hi">91%</span><div class="demo-gr-body"><div class="demo-gr-name">Regional Health Foundation (sample)</div><div class="demo-gr-meta">Foundation · $200K–$500K · Open calls vary</div></div><span class="demo-draft-btn">Draft →</span></div>
+                  <div class="demo-gr" id="dgr-3"><span class="demo-score hi">88%</span><div class="demo-gr-body"><div class="demo-gr-name">Children &amp; Families Fund (sample)</div><div class="demo-gr-meta">Foundation · $150K–$600K · Letter of inquiry first</div></div><span class="demo-draft-btn">Draft →</span></div>
+                  <div class="demo-gr" id="dgr-4"><span class="demo-score mid">76%</span><div class="demo-gr-body"><div class="demo-gr-name">County Community Foundation (sample)</div><div class="demo-gr-meta">Foundation · $50K–$100K · Rolling</div></div><span class="demo-draft-btn">Draft →</span></div>
                 </div>
               </div>
               <!-- Phase 3: AI writing proposal -->
@@ -2595,11 +2603,12 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
   <!-- STAT BAND -->
   <section class="stat-band stat-band-on-grad">
     <div class="wrap reveal-group">
-      <div class="stat-cell"><div class="fig" data-count="143" data-suffix=":1">143:1</div><div class="cap">Nonprofits per working grant writer in the US</div></div>
-      <div class="stat-cell"><div class="fig" data-count="88" data-suffix="%">88%</div><div class="cap">Of nonprofits run on under $500K, most with no grant staff</div></div>
-      <div class="stat-cell"><div class="fig">80–200</div><div class="cap">Hours one federal application takes to write by hand</div></div>
-      <div class="stat-cell"><div class="fig">$3K–$15K</div><div class="cap">What a grant writer charges per proposal</div></div>
+      <div class="stat-cell"><div class="fig" data-count="88" data-suffix="%">88%</div><div class="cap">Of US nonprofits run on under $500K a year, most with no grant staff</div></div>
+      <div class="stat-cell"><div class="fig">20–40</div><div class="cap">Hours a first-time applicant typically spends on one grant proposal</div></div>
+      <div class="stat-cell"><div class="fig">$3K–$15K</div><div class="cap">What a freelance grant writer charges per proposal</div></div>
+      <div class="stat-cell"><div class="fig">$0</div><div class="cap">What Grange costs to start</div></div>
     </div>
+    <p class="wrap" style="font-size:12px;color:var(--muted);margin-top:14px;text-align:center">Estimates drawn from published nonprofit-sector surveys (National Council of Nonprofits, Candid). Every organization is different.</p>
   </section>
 
   <!-- DISPLAY CARDS - deadline & calendar features -->
@@ -2639,7 +2648,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
               <span class="dc-title" style="color:var(--accent)">Grant Deadline</span>
             </div>
             <p class="dc-desc">DHHS Healthy Communities Initiative</p>
-            <p class="dc-date">Full proposal · Due Jun 15 · 14 days left</p>
+            <p class="dc-date">Full proposal · Due in 14 days</p>
           </div>
           <div class="dc">
             <div class="dc-row">
@@ -2648,8 +2657,8 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
               </span>
               <span class="dc-title" style="color:var(--warn-ink)">LOI Required</span>
             </div>
-            <p class="dc-desc">W.K. Kellogg Foundation, Community Healing</p>
-            <p class="dc-date">Letter of inquiry · your goal: Jul 1 · 30 days left</p>
+            <p class="dc-desc">Children &amp; Families Fund (sample)</p>
+            <p class="dc-date">Letter of inquiry · your goal: in 30 days</p>
           </div>
           <div class="dc">
             <div class="dc-row">
@@ -2659,7 +2668,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
               <span class="dc-title" style="color:var(--ok)">3 New Matches</span>
             </div>
             <p class="dc-desc">Review this week's grant pipeline</p>
-            <p class="dc-date">Updated today · 12 matches · Next due Jun 15</p>
+            <p class="dc-date">Updated today · 12 matches · Next due in 14 days</p>
           </div>
           <div class="dc">
             <div class="dc-row">
@@ -2668,8 +2677,8 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
               </span>
               <span class="dc-title" style="color:#4f5fc4">Draft Ready</span>
             </div>
-            <p class="dc-desc">Robert Wood Johnson, Health Equity</p>
-            <p class="dc-date">Proposal draft · 94% match · Due Jul 8</p>
+            <p class="dc-desc">Regional Health Foundation (sample)</p>
+            <p class="dc-date">Proposal draft · 94% match · Due in 5 weeks</p>
           </div>
           <div class="dc">
             <div class="dc-row">
@@ -2719,24 +2728,24 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
           <div class="proc-num">02</div>
           <div class="proc-text">
             <h3>See the grants you qualify for</h3>
-            <p>Grange AI searches every open grant on Grants.gov and a vetted list of foundations, and scores each one against your mission, NTEE code and eligibility.</p>
+            <p>Grange AI searches every open grant on Grants.gov, past federal awards on USASpending.gov and a short curated list of funders, and scores each one against your mission, NTEE code and eligibility.</p>
           </div>
           <div class="proc-visual">
             <div class="dp-card hiw-card" id="hiw-c2">
               <div class="dp-card-bar">
                 <span class="dp-dot" style="background:#ff5f56"></span><span class="dp-dot" style="background:#ffbe2e"></span><span class="dp-dot" style="background:#27c93f"></span>
-                <span class="dp-bar-label">Grant discovery · live search</span>
+                <span class="dp-bar-label">Grant discovery · sample run</span>
                 <span class="demo-spinner" style="margin-left:auto;flex-shrink:0"></span>
               </div>
               <div class="dp-card-body">
                 <div class="dp-scan-stat">
                   <span class="dp-scan-count" id="hiw-c2-n">0</span>
-                  <span class="dp-scan-sub">grants scored today</span>
+                  <span class="dp-scan-sub">records checked (sample)</span>
                 </div>
                 <div class="dp-prog-track"><div class="dp-prog-bar" id="hiw-c2-prog"></div></div>
                 <div class="dp-scan-items">
                   <div class="dp-scan-row" data-delay="450"><span class="dp-scan-tick">✓</span><span>Grants.gov: <span class="dp-scan-hl">1,247 matched</span></span></div>
-                  <div class="dp-scan-row" data-delay="950"><span class="dp-scan-tick">✓</span><span>Vetted foundations: <span class="dp-scan-hl">13 checked</span></span></div>
+                  <div class="dp-scan-row" data-delay="950"><span class="dp-scan-tick">✓</span><span>Curated funders: <span class="dp-scan-hl">9 checked</span></span></div>
                   <div class="dp-scan-row" data-delay="1450" style="color:var(--accent);font-weight:600"><span style="color:var(--accent);font-size:11px">→</span><span>Scoring against your profile…</span></div>
                 </div>
               </div>
@@ -3025,6 +3034,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>2 AI proposal drafts a month</li>
             <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>Readiness checklist and IRS check</li>
             <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>Deadline tracking and calendar alerts</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>Word, PDF and text export</li>
           </ul>
           <button class="btn btn-outline btn-block" onclick="go('login')">Start free</button>
         </div>
@@ -3037,7 +3047,6 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>Everything in Free</li>
             <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>Every grant match, not just the top 5</li>
             <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>15 AI proposal drafts a month</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>Word, PDF and text export</li>
           </ul>
           <button class="btn btn-outline btn-block" onclick="go('login')">Start free</button>
         </div>
@@ -3056,7 +3065,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
           <button class="btn btn-accent btn-block" onclick="go('login')">Start free</button>
         </div>
       </div>
-      <p class="pricing-note">Win one $5,000 grant and it pays for 16 years of Pro. Grant amounts are examples: funders decide every award.</p>
+      <p class="pricing-note">Paid plans open soon. Until then every account is on the Free plan. Funders decide every award; Grange helps you apply.</p>
     </div>
   </section>
 
@@ -3313,7 +3322,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
           <li><strong>Registration:</strong> You must create an account to use most features of Grange AI. You agree to provide accurate, complete, and up-to-date information during registration and to keep this information current.</li>
           <li><strong>Account security:</strong> You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. Notify us immediately at <a href="mailto:executivegrangeai@gmail.com" style="color:var(--accent);text-decoration:none;">executivegrangeai@gmail.com</a> if you suspect unauthorized access.</li>
           <li><strong>One account per organization:</strong> Each account is intended for a single nonprofit organization. Team members within an organization may share an account; sharing accounts across unaffiliated organizations is not permitted.</li>
-          <li><strong>Age requirement:</strong> You must be at least 18 years old to create an account and use the Service.</li>
+          <li><strong>Age requirement:</strong> You must be at least 13 years old to create an account. If you are under 18, you may use the Free plan only with a parent's or guardian's permission, and an adult with authority to bind your organization must accept these Terms and any paid plan on its behalf.</li>
         </ul>
       </section>
 
@@ -3357,7 +3366,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
           <li><strong>Cancellation:</strong> You may cancel your subscription at any time by emailing executivegrangeai@gmail.com. Cancellation takes effect at the end of the current billing period. You will retain access to paid features until that date.</li>
           <li><strong>Refunds:</strong> We do not offer refunds for partial billing periods except where required by applicable law. If you believe you have been billed in error, contact us within 30 days of the charge.</li>
           <li><strong>Taxes:</strong> Prices are exclusive of applicable taxes. You are responsible for paying any taxes, levies, or duties imposed by applicable law.</li>
-          <li><strong>Free trials:</strong> Where offered, free trials automatically convert to a paid subscription at the end of the trial period. You may cancel before the trial ends to avoid charges.</li>
+          <li><strong>Free plan:</strong> The Free plan needs no payment card and never converts to a paid plan on its own. We do not offer free trials of paid plans; a paid plan is charged when you choose it.</li>
           <li><strong>Disputed charges:</strong> Contact us at <a href="mailto:executivegrangeai@gmail.com" style="color:var(--accent);text-decoration:none;">executivegrangeai@gmail.com</a> before initiating a chargeback. We will work to resolve billing disputes promptly.</li>
         </ul>
       </section>
@@ -3476,7 +3485,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
         </div>
         <div style="background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:24px;">
           <h3 style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px;">Uptime</h3>
-          <p style="font-size:14.5px;color:var(--ink-soft);line-height:1.7;">Grange runs on Supabase's free plan, which has no uptime guarantee and pauses a project after 7 days without traffic. A scheduled job reads the database twice a week so it stays awake. Supabase's paid plans never pause.</p>
+          <p style="font-size:14.5px;color:var(--ink-soft);line-height:1.7;">Grange runs on Supabase's free plan, which has no uptime guarantee and can pause a project after a week of low activity (it did in October and early November 2026). A scheduled job now reads the database three times a day so it stays awake, and we are moving to a paid plan, which never pauses.</p>
         </div>
       </div>
     </div>
@@ -3780,8 +3789,8 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         Live walkthrough
       </span>
-      <h1 class="dp-intro-h1">From 990 to funded<br>in five steps</h1>
-      <p class="dp-intro-sub">Watch Grange AI turn a document upload into a submission-ready grant proposal. No grant writer needed.</p>
+      <h1 class="dp-intro-h1">From 990 to first draft<br>in five steps</h1>
+      <p class="dp-intro-sub">Watch Grange AI turn a document upload into a complete first draft, ready for your review. No grant writer needed. The numbers below are a sample, not live data.</p>
       <div class="dp-scroll-hint">
         <span>Scroll to see how it works</span>
         <span class="dp-bounce"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>
@@ -3820,24 +3829,24 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
       <div>
         <div class="dp-step-tag">Step 02 &middot; Discovery</div>
         <h2 class="dp-headline">Every open grant,<br>scanned for you</h2>
-        <p class="dp-desc">Each time you run discovery, Grange searches the open grants on Grants.gov live, adds a vetted list of foundations, and scores each one against your mission, geography and budget.</p>
+        <p class="dp-desc">Each time you run discovery, Grange searches the open grants on Grants.gov live, adds past federal awards from USASpending.gov and a short curated list of funders, and scores each one against your mission, geography and budget.</p>
       </div>
       <div>
         <div class="dp-card">
           <div class="dp-card-bar">
             <span class="dp-dot" style="background:#ff5f56"></span><span class="dp-dot" style="background:#ffbe2e"></span><span class="dp-dot" style="background:#27c93f"></span>
-            <span class="dp-bar-label">Grant discovery · live search</span>
+            <span class="dp-bar-label">Grant discovery · sample run</span>
             <span class="demo-spinner" style="margin-left:auto;flex-shrink:0"></span>
           </div>
           <div class="dp-card-body">
             <div class="dp-scan-stat">
               <span class="dp-scan-count" id="dp-scan-n">0</span>
-              <span class="dp-scan-sub">grants scored today</span>
+              <span class="dp-scan-sub">records checked (sample)</span>
             </div>
             <div class="dp-prog-track"><div class="dp-prog-bar"></div></div>
             <div class="dp-scan-items">
               <div class="dp-scan-row" data-delay="400"><span class="dp-scan-tick">✓</span><span>Grants.gov: <span class="dp-scan-hl">1,247 matched</span></span></div>
-              <div class="dp-scan-row" data-delay="900"><span class="dp-scan-tick">✓</span><span>Vetted foundations: <span class="dp-scan-hl">13 checked</span></span></div>
+              <div class="dp-scan-row" data-delay="900"><span class="dp-scan-tick">✓</span><span>Curated funders: <span class="dp-scan-hl">9 checked</span></span></div>
               <div class="dp-scan-row" data-delay="1400"><span class="dp-scan-tick">✓</span><span>USASpending.gov: <span class="dp-scan-hl">312 past awards</span></span></div>
               <div class="dp-scan-row" data-delay="1900" style="color:var(--accent);font-weight:600"><span style="color:var(--accent);font-size:13px">→</span><span>Scoring against your profile…</span></div>
             </div>
@@ -3859,14 +3868,14 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
         <div class="dp-card">
           <div class="dp-card-bar">
             <span class="dp-dot" style="background:#ff5f56"></span><span class="dp-dot" style="background:#ffbe2e"></span><span class="dp-dot" style="background:#27c93f"></span>
-            <span class="dp-bar-label">12 new matches this week</span>
+            <span class="dp-bar-label">Your top matches · sample</span>
           </div>
           <div class="dp-card-body">
             <div class="dp-grant-list">
-              <div class="dp-grant-row" data-delay="200"><span class="dp-score-badge dp-score-hi">94%</span><div class="dp-grant-info"><div class="dp-grant-title">DHHS Healthy Communities Initiative</div><div class="dp-grant-meta">Federal · up to $250,000 · Due Jun 15</div></div><span class="dp-grant-cta">Draft →</span></div>
-              <div class="dp-grant-row" data-delay="500"><span class="dp-score-badge dp-score-hi">91%</span><div class="dp-grant-info"><div class="dp-grant-title">Robert Wood Johnson Foundation</div><div class="dp-grant-meta">Foundation · $200K–$500K · Open calls vary</div></div><span class="dp-grant-cta">Draft →</span></div>
-              <div class="dp-grant-row" data-delay="800"><span class="dp-score-badge dp-score-hi">88%</span><div class="dp-grant-info"><div class="dp-grant-title">W.K. Kellogg Foundation, Community Healing</div><div class="dp-grant-meta">Foundation · $150K–$600K · LOI any time</div></div><span class="dp-grant-cta">Draft →</span></div>
-              <div class="dp-grant-row" data-delay="1100"><span class="dp-score-badge dp-score-mid">76%</span><div class="dp-grant-info"><div class="dp-grant-title">California Community Foundation</div><div class="dp-grant-meta">Foundation · $50K–$100K · Rolling</div></div><span class="dp-grant-cta">Draft →</span></div>
+              <div class="dp-grant-row" data-delay="200"><span class="dp-score-badge dp-score-hi">94%</span><div class="dp-grant-info"><div class="dp-grant-title">DHHS Healthy Communities Initiative</div><div class="dp-grant-meta">Federal · up to $250,000 · Due in 14 days</div></div><span class="dp-grant-cta">Draft →</span></div>
+              <div class="dp-grant-row" data-delay="500"><span class="dp-score-badge dp-score-hi">91%</span><div class="dp-grant-info"><div class="dp-grant-title">Regional Health Foundation (sample)</div><div class="dp-grant-meta">Foundation · $200K–$500K · Open calls vary</div></div><span class="dp-grant-cta">Draft →</span></div>
+              <div class="dp-grant-row" data-delay="800"><span class="dp-score-badge dp-score-hi">88%</span><div class="dp-grant-info"><div class="dp-grant-title">Children &amp; Families Fund (sample)</div><div class="dp-grant-meta">Foundation · $150K–$600K · Letter of inquiry first</div></div><span class="dp-grant-cta">Draft →</span></div>
+              <div class="dp-grant-row" data-delay="1100"><span class="dp-score-badge dp-score-mid">76%</span><div class="dp-grant-info"><div class="dp-grant-title">County Community Foundation (sample)</div><div class="dp-grant-meta">Foundation · $50K–$100K · Rolling</div></div><span class="dp-grant-cta">Draft →</span></div>
             </div>
           </div>
         </div>
@@ -3880,7 +3889,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
       <div>
         <div class="dp-step-tag">Step 04 &middot; Drafting</div>
         <h2 class="dp-headline">Full proposal drafted<br>in minutes</h2>
-        <p class="dp-desc">Click Draft and Grange AI writes every section: executive summary, statement of need, theory of change, evaluation plan. Each sentence pulls from your 990 and profile.</p>
+        <p class="dp-desc">Click Draft and Grange AI writes every section: executive summary, statement of need, theory of change, evaluation plan. Every sentence pulls from your profile, which your 990 pre-fills, and anything it can't confirm is flagged for you to check.</p>
       </div>
       <div>
         <div class="dp-card">
@@ -4008,6 +4017,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             onkeydown="if(event.key==='Enter')siGoCode()">
           <button class="si-email-arr" id="si-email-btn" aria-label="Continue" disabled onclick="siGoCode()">→</button>
         </div>
+        <div class="field-err" id="si-email-err" role="alert" aria-live="polite"></div>
 
         <p class="si-terms">
           By continuing, you agree to our <a href="#" onclick="go('terms');return false;">Terms</a>, <a href="#" onclick="go('privacy');return false;">Privacy Notice</a> and <a href="#" onclick="legalGoto('privacy', 5);return false;">Cookie Policy</a>.
@@ -4973,7 +4983,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             <div class="panel-head"><h3>Grant</h3></div>
             <div style="background:var(--accent-tint);border-radius:var(--r);padding:14px 16px;margin-bottom:18px">
               <div id="gen-grant-title" style="font-size:14.5px;font-weight:700;color:var(--ink)">DHHS Healthy Communities Initiative</div>
-              <div id="gen-grant-meta" style="font-size:13px;color:var(--accent-ink);margin-top:3px">Federal &middot; up to $250,000 &middot; Due Jun 15, 2026 &middot; 94% match</div>
+              <div id="gen-grant-meta" style="font-size:13px;color:var(--accent-ink);margin-top:3px">Sample grant &middot; pick a real one from Discovery or paste the funder's call below</div>
             </div>
             <div class="fieldset"><label class="field-label">Proposal type <button type="button" class="ob-help-btn" aria-expanded="false" aria-label="What does this mean?" onclick="toggleTip(this)">?</button></label><div class="ob-help-text" hidden>Pick the document the funder asked for. A <b>Letter of inquiry (LOI)</b> is a short 1 to 2 page pitch you send first. A <b>Concept paper</b> is a brief outline of your idea. A <b>Full grant narrative</b> is the complete application. A <b>Progress report</b> updates a funder on a grant you already won.</div>
               <select id="gen-proposal-type"><option>Full grant narrative</option><option>Letter of inquiry</option><option>Concept paper</option><option>Progress report</option></select></div>
@@ -5237,6 +5247,13 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
         <div class="fieldset"><label class="field-label">Activities</label><textarea id="pf-activities" placeholder="What your program does, week to week."></textarea></div>
         <div class="fieldset"><label class="field-label">Outputs</label><textarea id="pf-outputs" placeholder="Countable results: people served, hours delivered…"></textarea></div>
         <div class="fieldset"><label class="field-label">Outcomes</label><textarea id="pf-outcomes" placeholder="The measurable change: enrollment, retention, test gains…"></textarea></div>
+
+        <div class="divider">Your account</div>
+        <div class="fieldset full" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <button type="button" class="btn btn-outline btn-sm" onclick="exportMyData()">Download my data (JSON)</button>
+          <button type="button" class="btn btn-outline btn-sm" style="color:#b4371c;border-color:#e4b3a6" onclick="deleteMyAccount()">Delete my account</button>
+          <div style="flex-basis:100%;font-size:12.5px;color:var(--muted);line-height:1.5">The download holds your profile, answers, saved grants, proposals, deadlines and document list, as the Privacy Policy promises. Deleting removes your account and all of its data at once; it cannot be undone, so export first if you want a copy.</div>
+        </div>
       </div>
     </main>
   </div>
@@ -5583,7 +5600,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
               <div class="pf-row"><div class="pf-ic yes"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/></svg></div><span class="pf-text">Grant matches <span class="pf-note ok">Top 5</span></span></div>
               <div class="pf-row"><div class="pf-ic yes"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/></svg></div><span class="pf-text">AI proposal drafts <span class="pf-note ok">2 a month</span></span></div>
               <div class="pf-row"><div class="pf-ic yes"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/></svg></div><span class="pf-text">Deadline tracking and calendar alerts</span></div>
-              <div class="pf-row"><div class="pf-ic no"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round"/></svg></div><span class="pf-text dim">Word, PDF and text export</span></div>
+              <div class="pf-row"><div class="pf-ic yes"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/></svg></div><span class="pf-text">Word, PDF and text export</span></div>
               <div class="pf-row"><div class="pf-ic no"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round"/></svg></div><span class="pf-text dim">Learns from your past proposals</span></div>
               <div class="pf-row"><div class="pf-ic no"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round"/></svg></div><span class="pf-text dim">Grant management after you win</span></div>
             </div>
@@ -5596,8 +5613,8 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             <div class="pc-billed" id="starter-billed">$10 a month, billed yearly</div>
             <div class="pc-save" id="starter-save">You save $59.88 a year</div>
             <p class="pc-desc">For groups applying to a few grants a year.</p>
-            <p class="pc-earn" id="starter-earn">One $1,000 grant pays for 8 years of Starter.</p>
-            <button class="pc-cta primary" onclick="selectTier('starter')">Choose Starter</button>
+            <p class="pc-earn" id="starter-earn">Opens soon. Billed through Stripe; cancel any time.</p>
+            <button class="pc-cta primary" onclick="selectTier('starter')">Coming soon</button>
             <div class="pc-div"></div>
             <div class="pc-features">
               <div class="pf-row"><div class="pf-ic yes"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/></svg></div><span class="pf-text">Profile from a survey or Form 990</span></div>
@@ -5619,8 +5636,8 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
             <div class="pc-billed" id="pro-billed">$25 a month, billed yearly</div>
             <div class="pc-save" id="pro-save">You save $131.88 a year</div>
             <p class="pc-desc">For organizations that apply all year and want to keep every grant they win.</p>
-            <p class="pc-earn" id="pro-earn">One $5,000 grant pays for 16 years of Pro.</p>
-            <button class="pc-cta primary" onclick="selectTier('pro')">Choose Pro</button>
+            <p class="pc-earn" id="pro-earn">Opens soon. Billed through Stripe; cancel any time.</p>
+            <button class="pc-cta primary" onclick="selectTier('pro')">Coming soon</button>
             <div class="pc-div"></div>
             <div class="pc-features">
               <div class="pf-row"><div class="pf-ic yes"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/></svg></div><span class="pf-text">Profile from a survey or Form 990</span></div>
@@ -5635,7 +5652,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
           </div>
         </div>
 
-        <p class="pricing-foot">Grant amounts are examples: funders decide every award.</p>
+        <p class="pricing-foot">Paid plans aren’t open yet: everyone is on the Free plan, and nobody is charged. Funders decide every award.</p>
       </div>
     </main>
   </div>
@@ -5663,7 +5680,7 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
         ctaEl.onclick = function(){ selectTier('free'); };
       } else {
         ctaEl.className = 'pc-cta primary';
-        ctaEl.textContent = tid === 'pro' ? 'Choose Pro' : 'Choose Starter';
+        ctaEl.textContent = PAID_PLANS_OPEN ? (tid === 'pro' ? 'Choose Pro' : 'Choose Starter') : 'Coming soon';
         ctaEl.onclick = function(){ selectTier(tid); };
       }
     });
@@ -5685,22 +5702,28 @@ body:has(#acp-nudge.show) .toast { bottom: 268px; z-index: 9001; }   /* sit abov
       } catch(e) { console.warn('plan change', e); toast('Couldn’t change your plan right now. Please try again.'); }
       return;
     }
-    // Paid tier: update profile directly for now (Stripe to be wired later)
+    // Paid tier: go through Stripe Checkout (create-checkout). The browser never sets a paid tier
+    // itself; the Stripe webhook does that after payment. While paid plans are closed the function
+    // answers 503 and the user sees "Coming soon".
+    if (!PAID_PLANS_OPEN) { toast('Paid plans aren’t open yet. You’re on the Free plan for now, and nobody is charged.'); return; }
     try {
-      const { error } = await window.sb.from('profiles').update({ tier: tierId }).eq('user_id', window._grange.user.id);
-      if (error) throw error;   // don't claim a plan change the database didn't take
-      if (window._grange.profile) window._grange.profile.tier = tierId;
-      rebuildSidebars();
-      renderPlanScreen();
-      toast('Plan updated to ' + tierId.charAt(0).toUpperCase() + tierId.slice(1) + '!');
+      const { data: { session } } = await window.sb.auth.getSession();
+      if (!session) { toast('Please sign in first.'); return; }
+      const r = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/create-checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ tier: tierId, billing: billing }),
+      });
+      const d = await r.json().catch(function(){ return {}; });
+      if (r.ok && d && d.url) { window.location.href = d.url; return; }
+      toast((d && d.error) || 'Couldn’t start checkout right now. Please try again.');
     } catch(e) {
-      console.warn('plan change', e);
-      // The plan column isn't in the live database yet (paid plans aren't switched on): say so plainly
-      // instead of "try again", which could never work.
-      const notReady = e && (e.code === 'PGRST204' || e.code === '42703' || /column .*tier|tier.*column/i.test(e.message || ''));
-      toast(notReady ? 'Paid plans aren’t open yet. You’re on the Free plan for now.' : 'Couldn’t change your plan right now. Please try again.');
+      console.warn('checkout', e);
+      toast('Couldn’t start checkout right now. Please try again.');
     }
   };
+  // Flip to true (and set PAID_PLANS_OPEN=true on create-checkout) once the Stripe flow has been
+  // tested end to end in test mode. Until then the cards say "Coming soon".
+  var PAID_PLANS_OPEN = false;
 
   // Prices (USD). Yearly is a flat price per year; the saving is against paying monthly for 12 months.
   // Keep in step with supabase/functions/create-checkout (PRICES) and the landing page's pricing section.
@@ -6010,6 +6033,12 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('ai-chat-fab')?.focus();
   }
 });
+function skipToMain() {
+  const t = document.querySelector('.screen.active main, .screen.active .app-main, .screen.active h1, .screen.active [role="heading"]');
+  if (!t) return;
+  if (!t.hasAttribute('tabindex')) t.setAttribute('tabindex', '-1');
+  t.focus({ preventScroll: false });
+}
 function go(id, opts) {
   if (window._pfDirty && window._currentScreen === 'profile' && id !== 'profile') {
     if (!confirm('You have unsaved changes to your profile. Leave without saving them?')) {
@@ -6022,7 +6051,9 @@ function go(id, opts) {
   // Each screen change is a browser-history entry, so Back/Forward move between
   // screens instead of leaving the app (see the popstate handler below).
   if (!(opts && opts.fromHistory) && prevScreen !== id && SCREENS.includes(id)) {
-    try { history[prevScreen ? 'pushState' : 'replaceState']({ grangeScreen: id }, ''); } catch (_) {}
+    // The address carries the screen (#terms, #discovery…) so pages can be linked and reloaded.
+    const url = location.pathname + location.search + (id === 'landing' ? '' : '#' + id);
+    try { history[prevScreen ? 'pushState' : 'replaceState']({ grangeScreen: id }, '', url); } catch (_) {}
   }
   // track active screen (drives the mobile hamburger nav visibility)
   window._currentScreen = id;
@@ -6212,17 +6243,25 @@ async function ragAdd() {
   const btn = document.getElementById('rag-add-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
   try {
-    const r = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/rag-ingest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
-      body: JSON.stringify({ text, label }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (r.ok && d.ok) {
-      toast('Added ' + d.chunks + ' passage' + (d.chunks > 1 ? 's' : '') + ' to Grange’s memory.');
-      if (ta) ta.value = ''; if (lblEl) lblEl.value = '';
-      loadRagDocs();
-    } else { toast(d.error || 'Could not add that. Please try again.'); }
+    // The function embeds about 24 passages per call (the edge worker's compute budget), and tells
+    // us where to continue; a 15-page proposal takes a few calls but lands as one document.
+    let documentId = null, offset = 0, total = 0, d = {};
+    for (let call = 0; call < 20; call++) {
+      const r = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/rag-ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify(documentId ? { text, label, document_id: documentId, chunk_offset: offset } : { text, label }),
+      });
+      d = await r.json().catch(() => ({}));
+      if (!(r.ok && d.ok)) { toast(d.error || 'Could not add that. Please try again.'); return; }
+      documentId = d.document_id; total = d.chunks;
+      if (d.next_offset == null) break;
+      offset = d.next_offset;
+      if (btn) btn.textContent = 'Adding… ' + Math.round(100 * offset / (d.total_chunks || offset)) + '%';
+    }
+    toast('Added ' + total + ' passage' + (total > 1 ? 's' : '') + ' to Grange’s memory.');
+    if (ta) ta.value = ''; if (lblEl) lblEl.value = '';
+    loadRagDocs();
   } catch (e) { console.error('ragAdd', e); toast('Could not add that. Please try again.'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = "Add to Grange's memory"; } }
 }
@@ -8092,7 +8131,16 @@ async function generate() {
   if (_need.length) {
     genShowConfig();
     const first = document.getElementById(_need[0][0]);
-    _need.forEach(([id]) => { const el = document.getElementById(id); el.style.borderColor = 'var(--accent)'; el.addEventListener('input', () => { el.style.borderColor = ''; }, { once: true }); });
+    _need.forEach(([id, what]) => {
+      const el = document.getElementById(id);
+      el.style.borderColor = 'var(--accent)';
+      el.setAttribute('aria-invalid', 'true');
+      // an inline line under the field, not just a red outline (the toast can be missed)
+      let err = document.getElementById(id + '-err');
+      if (!err) { err = document.createElement('div'); err.id = id + '-err'; err.className = 'field-err'; err.setAttribute('role', 'alert'); el.insertAdjacentElement('afterend', err); }
+      err.textContent = 'Add ' + what + ' before drafting.'; err.classList.add('on');
+      el.addEventListener('input', () => { el.style.borderColor = ''; el.removeAttribute('aria-invalid'); err.classList.remove('on'); }, { once: true });
+    });
     if (first) { first.scrollIntoView({ block: 'center' }); first.focus(); }
     toast('Before drafting, add ' + _need.map((n) => n[1]).join(', ').replace(/, ([^,]*)$/, ' and $1') + '.');
     return;
@@ -9415,7 +9463,7 @@ function authErrorText(error, fallback) {
 
 /* ─── GOOEY TEXT MORPHING ───────────────────────────────── */
 (function(){
-  const TEXTS        = ['written for you.', 'found for you.', 'won for you.', 'funded for you.'];
+  const TEXTS        = ['written for you.', 'found for you.', 'checked for you.', 'drafted for you.'];   // no outcome promises: Grange drafts, funders decide
   const MORPH_TIME   = 1.2;   // seconds per transition
   const COOLDOWN     = 2.4;   // seconds shown static
 
@@ -9518,7 +9566,7 @@ function authErrorText(error, fallback) {
       const counter = document.getElementById('dp-scan-n');
       if (counter && !counter._counted) {
         counter._counted = true;
-        const target=2549, dur=3000, t0=performance.now();
+        const target=1568, dur=3000, t0=performance.now();   // 1,247 + 9 + 312: the three sample lines add up
         (function tick(now){ const p=Math.min((now-t0)/dur,1); counter.textContent=Math.round(target*(1-Math.pow(1-p,3))); if(p<1)requestAnimationFrame(tick); })(performance.now());
       }
     }
@@ -9813,15 +9861,23 @@ function authErrorText(error, fallback) {
     if (mat) { mat.uniforms.u_rev.value = 0; if (clock) clock.start(); }
   };
 
+  function siEmailError(msg) {
+    const el = document.getElementById('si-email-err'), inp = document.getElementById('si-email-input');
+    if (el) { el.textContent = msg || ''; el.classList.toggle('on', !!msg); }
+    if (inp) { inp.setAttribute('aria-invalid', msg ? 'true' : 'false'); if (msg) inp.setAttribute('aria-describedby', 'si-email-err'); }
+  }
   window.siEmailInput = function(inp) {
     const btn = document.getElementById('si-email-btn');
     if (btn) btn.disabled = !(inp.value && inp.value.includes('@'));
+    siEmailError('');
   };
 
   // step 1 → step 2 (email entered → ask for password)
   window.siGoCode = function() {
-    const v = (document.getElementById('si-email-input') || {}).value || '';
-    if (!v || !v.includes('@')) return;
+    const v = ((document.getElementById('si-email-input') || {}).value || '').trim();
+    if (!v) { siEmailError('Enter the email address you signed up with.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) { siEmailError('That doesn’t look like an email address. Check for a typo, like a missing “.org” or “.com”.'); document.getElementById('si-email-input')?.focus(); return; }
+    siEmailError('');
     const lbl = document.getElementById('si-pw-email');
     if (lbl) lbl.textContent = v.trim();
     siShowStep('code', 'fwd');
@@ -9984,10 +10040,14 @@ const PUBLIC_SCREENS = ['landing','login','signin','demo','privacy','terms','sec
 window._deepLink = null;
 try {
   const u = new URL(location.href), g = u.searchParams.get('go');
-  if (g !== null) {
-    if (SCREENS.includes(g) && !['landing', 'login', 'signin', 'tutorial', 'onboarding'].includes(g)) window._deepLink = g;
+  // #screen in the address (what go() writes) is the same thing as ?go=screen.
+  const h = (u.hash || '').replace(/^#/, '');
+  const want = g !== null ? g : (h && SCREENS.includes(h) ? h : null);
+  if (want !== null) {
+    if (SCREENS.includes(want) && !['landing', 'login', 'signin', 'tutorial', 'onboarding'].includes(want)) window._deepLink = want;
+    else if (want === 'login' || want === 'signin') window._deepLink = 'signin';
     u.searchParams.delete('go');
-    history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    history.replaceState(history.state, '', u.pathname + u.search + (window._deepLink ? '#' + window._deepLink : ''));
   }
 } catch (_) {}
 function _visitorDeepLink() {
@@ -10091,6 +10151,45 @@ function tutorialDone(ctx) {
   try { return localStorage.getItem('grange_tut_' + ctx.user.id) === '1'; } catch (e) { return false; }
 }
 
+/* ── Privacy-page promises: data export and account deletion (Nov 2026) ── */
+async function exportMyData() {
+  const uid = window._grange?.user?.id;
+  if (!window.sb || !uid) { toast('Sign in first.'); return; }
+  toast('Collecting your data…');
+  const out = { exported_at: new Date().toISOString(), user: { id: uid, email: window._grange?.user?.email || null }, tables: {} };
+  // Row-level security limits each of these to the signed-in user's own rows.
+  const tables = ['profiles', 'onboarding_answers', 'grants', 'proposals', 'deadlines', 'reminders', 'documents', 'readiness_items', 'notifications', 'ai_jobs', 'proposal_usage', 'budgets', 'budget_line_items', 'programs', 'logic_models', 'logic_model_items', 'match_scores', 'eligibility_checks', 'grant_answers', 'draft_outcomes'];
+  for (const t of tables) {
+    try { const { data, error } = await sb.from(t).select('*').limit(5000); if (!error) out.tables[t] = data || []; } catch (_) {}
+  }
+  try { out.local_drafts = listDrafts(); } catch (_) {}
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'grange-ai-export-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Downloaded your data.');
+}
+async function deleteMyAccount() {
+  if (!window.sb || !window._grange?.user) { toast('Sign in first.'); return; }
+  const typed = prompt('This deletes your account and every grant, proposal, deadline and document in it. It cannot be undone.\n\nType DELETE to continue.');
+  if (typed !== 'DELETE') { if (typed !== null) toast('Not deleted. Type DELETE in capitals to confirm.'); return; }
+  try {
+    const { data: { session } } = await window.sb.auth.getSession();
+    if (!session) { toast('Your session expired. Sign in again first.'); return; }
+    const r = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/delete-account', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+      body: JSON.stringify({ confirm: 'DELETE' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!(r.ok && d.ok)) { toast(d.error || 'Could not delete the account right now. Email us and we will do it by hand.'); return; }
+    try { Object.keys(localStorage).filter(k => k.startsWith('grange_')).forEach(k => localStorage.removeItem(k)); } catch (_) {}
+    try { await window.sb.auth.signOut(); } catch (_) {}
+    window._grange = null;
+    toast('Your account and its data were deleted.');
+    go('landing');
+  } catch (e) { console.error('deleteMyAccount', e); toast('Could not delete the account right now. Please try again.'); }
+}
 async function signOut() {
   window._signingOut = true;
   window._pfDirty = false;   // signing out discards unsaved edits; don't also raise the browser's leave-page prompt
@@ -10879,7 +10978,7 @@ const TUT_STEPS = [
         <div class="tut-rail-copy">
           <span class="tut-eyebrow-chip rev" data-delay="0">Phase 02 · Discovery</span>
           <h1 class="tut-h-big" aria-label="See the funders you would never find.">${tutWords("See the funders you'd never find.")}</h1>
-          <p class="tut-copy-sub rev" data-delay="540">Grange searches every open grant on Grants.gov, a vetted list of foundations and past federal awards, and scores each one against your profile, so you skip the ones you can't win.</p>
+          <p class="tut-copy-sub rev" data-delay="540">Grange searches every open grant on Grants.gov, past federal awards and a short curated list of funders, and scores each one against your profile, so you skip the ones you can't win. The numbers in this tour are a sample.</p>
           <span class="tut-role-chip rev" data-delay="660">Your funder pipeline.</span>
         </div>
         <div class="tut-bay">
@@ -11347,8 +11446,10 @@ async function updateDashboard() {
 
   // ── 3. KPIs ──────────────────────────────────────────────────
   const discovered = discGrants.length;
-  // Drafts live in this browser (listDrafts) and as grants marked "drafting".
-  const drafted    = Math.max(dbProposals.length, listDrafts().length, dbGrants.filter(g => g.status === 'drafting').length);
+  // Count real drafts only: proposals saved to the database, and local drafts that have written text.
+  // (A saved grant marked "drafting", or an autosaved generator form, is not a draft yet.)
+  const localDrafts = listDrafts().filter(d => d && typeof d.doc === 'string' && d.doc.replace(/<[^>]+>/g, '').trim().length > 200).length;
+  const drafted    = Math.max(dbProposals.length, localDrafts);
   const submitted  = dbGrants.filter(g => g.status === 'submitted').length
                    + dbProposals.filter(p => p.status === 'submitted').length;
   const awarded    = dbGrants.filter(g => g.status === 'awarded').length;
@@ -12340,7 +12441,11 @@ function renderGrantCard(g) {
   // Why-eligible badges (e.g. "No 501(c)(3) required", "Open to small business")
   // from the discovery eligibility sweeps — so non-nonprofits see why a grant fits.
   const eligBadges = (g.eligTags || []).slice(0,2).map(e =>
-    `<span class="pill" style="background:rgba(28,122,67,.10);color:var(--ok,#1c7a43);border:1px solid rgba(28,122,67,.30)">${escHtml(e)}</span>`).join('');
+    `<span class="pill" title="From the eligibility codes Grants.gov lists for this opportunity" style="background:rgba(28,122,67,.10);color:var(--ok,#1c7a43);border:1px solid rgba(28,122,67,.30)">Grants.gov: ${escHtml(e.toLowerCase())}</span>`).join('');
+  // Federal money needs a free SAM.gov registration first, and that can take weeks: say so on the card.
+  const samNote = (g.govId || g.type === 'Federal')
+    ? `<div class="gc-np-note" style="margin-top:6px">Federal grant: you'll need a free <b>SAM.gov registration</b> (allow 2 to 8 weeks) before you can apply. <a href="#" onclick="event.stopPropagation();go('readiness');return false;">See the steps in Readiness →</a></div>`
+    : '';
 
   const duePill = g.deadline
     ? `<span class="pill ${dueUrgency(g.deadline)}" style="font-size:11px">${escHtml(g.deadlineLabel)}</span>`
@@ -12354,16 +12459,16 @@ function renderGrantCard(g) {
       : `<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();saveGrantToPipeline(window._grantsById&&window._grantsById['${jsAttr(g.id)}'],'saved')">Save</button>`;
 
   return `<div class="gcard" data-type="${escHtml(g.type)}" data-id="${escHtml(g.id)}">
-    <div class="gc-ring">
+    <div class="gc-ring" title="Profile match: a fixed formula over your focus areas, programs, mission words and location. No AI. The optional AI assessment below is a separate read.">
       <div class="ring ${rc}" style="--p:${g.matchScore};width:58px;height:58px;font-size:15px"><span>${g.matchScore}%</span></div>
-      <span class="lbl">match</span>
+      <span class="lbl">profile match</span>
     </div>
     <div class="gc-body">
       <div class="funder">${escHtml(g.funder)}</div>
       <div class="ttl">${escHtml(g.title)}</div>
       <div class="dsc">${escHtml(g.desc)}</div>
       <div class="gc-screen">${grantScreenHTML(g)}</div>
-      <div class="gc-elig">${grantEligHTML(g)}</div>
+      <div class="gc-elig">${grantEligHTML(g)}${samNote}</div>
       <div class="tags">${eligBadges}<span class="pill pill-ink">${escHtml(g.type)}</span>${tags}</div>
     </div>
     <div class="gc-meta">
@@ -12405,7 +12510,7 @@ async function assessGrant(id) {
   panel.innerHTML = wrapAssess('<div class="gca-loading"><span class="gca-spin"></span> Grange is assessing your fit for this grant…</div>');
   const g = (window._grantsById && window._grantsById[id]) || {};
   try {
-    const r = await runAiJob('assess_grant', { grant: { funder: g.funder, title: g.title, type: g.type, amount: g.amount, desc: g.desc, deadlineLabel: g.deadlineLabel } });
+    const r = await runAiJob('assess_grant', { grant: { funder: g.funder, title: g.title, type: g.type, amount: g.amount, desc: g.desc, deadlineLabel: g.deadlineLabel, eligibility: g.eligibility || '', eligTags: g.eligTags || [] } });
     const o = r && r.ok && r.output;
     const substantive = o && ((o.score > 0) || o.headline || o.why || (o.components && o.components.length) || (o.eligibility && o.eligibility.length));
     if (substantive) { try { localStorage.setItem(ck, JSON.stringify(r.output)); } catch (_) {} panel.innerHTML = assessHTML(r.output); }
@@ -12492,6 +12597,7 @@ function assessHTML(o) {
   const watch = (o.watch_outs || []).filter(Boolean);
   const watchHTML = watch.length ? '<div class="gca-watch"><div class="gca-watch-t">Watch-outs</div><ul style="margin:0;padding:0">' + watch.map(w => '<li>' + escHtml(w) + '</li>').join('') + '</ul></div>' : '';
   return wrapAssess(
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:8px">AI assessment · a separate read from the profile match above</div>' +
     '<div class="gca-result"><div class="gca-score">' +
       '<div class="ring ' + cls + ' cring" style="--p:' + score + ';width:56px;height:56px;font-size:15px"><span>' + score + '</span></div>' +
       '<div class="gca-band ' + bm.cls + '">' + bm.label + '</div></div>' +
@@ -13522,7 +13628,7 @@ function applyDiscFilters(query, type) {
     const isNp = rdyIsNonprofit(p);
     const firstGate = isNp
       ? { label: irsOk ? '501(c)(3) status, verified by the IRS' : '501(c)(3) tax-exempt status', ok: irsOk || !!(p.tax_exempt_status && p.tax_exempt_status !== 'unknown'), detail: irsOk ? 'Confirmed against the IRS Exempt Organizations file.' : 'Most foundation grants require it, and funders check it first.', fix:'Set your tax status' }
-      : { label: 'Entity type set', ok: !!(p.tax_exempt_status && p.tax_exempt_status !== 'unknown'), detail: 'Nonprofit status is not required for the grants we show you.', fix:'Set your entity type' };
+      : { label: 'Entity type set', ok: !!(p.tax_exempt_status && p.tax_exempt_status !== 'unknown'), detail: (p.tax_exempt_status && p.tax_exempt_status !== 'unknown') ? 'Nonprofit status is not required for the grants we show you.' : 'Tell us what kind of organization you are so your matches and checklist fit.', fix:'Set your entity type' };
     return [
       firstGate,
       { label:'EIN or tax ID on file', ok: !!(a.ein || p.ein), detail:'Your federal tax ID, asked for on most applications.', fix:'Add your EIN' },
@@ -13637,6 +13743,8 @@ function applyDiscFilters(query, type) {
     try { const raw = uid && localStorage.getItem('grange_irs_' + uid); window._irsVerified = raw ? JSON.parse(raw) : null; } catch (_) { window._irsVerified = null; }
     if (window.sb && uid) {
       try { const { data } = await sb.from('readiness_items').select('req_key,status').eq('user_id', uid); (data || []).forEach(r => { _rdyStatus[r.req_key] = r.status; }); } catch (_) {}
+      // A confirmed mission statement in the profile counts: don't say "Need it" for something the user already gave us.
+      if (!_rdyStatus.mission_track_record && String(p.mission || a.mission || '').trim().length > 40) _rdyStatus.mission_track_record = 'have';
     }
     await samInit(p, a, uid);   // SAM.gov guided-setup state (localStorage + registrations table)
     renderReadiness(p, a);

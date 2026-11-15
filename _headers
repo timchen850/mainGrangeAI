@@ -1,0 +1,23 @@
+# Cloudflare Pages response headers (https://developers.cloudflare.com/pages/configuration/headers/)
+# Added Nov 2026: the live site sent only nosniff and a referrer policy, so any page could frame it.
+#
+# The CSP keeps 'unsafe-inline' for scripts and styles because index.html is one file with inline
+# handlers; the useful parts are frame-ancestors (no clickjacking), object-src 'none', and the
+# allowlist of script/connect origins. Scripts: jsDelivr (three.js, supabase-js) and cdnjs (pdf.js,
+# mammoth). Connections: the Supabase project (REST, Auth, Functions, Realtime). Fonts: Google.
+# Add a host here before loading anything new from it, or the browser will block it.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: camera=(), geolocation=(), payment=(), usb=(), microphone=(self)
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://xewrvmqyzeiziimcmenj.supabase.co wss://xewrvmqyzeiziimcmenj.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; frame-src https://checkout.stripe.com https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; upgrade-insecure-requests
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+
+# Static assets can be cached hard; index.html keeps the default (revalidate) so deploys show at once.
+/icons/*
+  Cache-Control: public, max-age=604800, immutable
+/logo.png
+  Cache-Control: public, max-age=86400

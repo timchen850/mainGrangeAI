@@ -1,3 +1,5 @@
+> **Nov 15 2026: done.** All three functions in `supabase/functions/` now carry these fixes (see `DEPLOY_CHECKLIST.md`). This note is kept for the history.
+
 # AI backup fix for ai-chat and ai-worker (Oct 25, 2026)
 
 Groq shut down `llama-3.3-70b-versatile` on August 16, 2026. Every function that fell back to it
@@ -6,7 +8,7 @@ about 50 calls), those features stop.
 
 | Function | Status |
 |---|---|
-| `generate-proposal` (drafting, plan, polish) | Fixed and deployed (v8). Source: `supabase/live/generate-proposal.ts`. |
+| `generate-proposal` (drafting, plan, polish) | Fixed and deployed (v8); source now `supabase/functions/generate-proposal/index.ts`. |
 | `ai-chat` (the assistant) | Fixed on this branch in `supabase/functions/ai-chat/index.ts`, **not deployed**. Needs Tim's OK. |
 | `ai-worker` (scorecard, revision, reading a funder's call, match scores) | Andrew's code. Needs the change below, with his OK. |
 

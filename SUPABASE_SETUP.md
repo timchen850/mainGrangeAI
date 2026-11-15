@@ -73,15 +73,17 @@ security-advisor item and can only be set in the dashboard.
 Browser  ──Bearer JWT──▶  Edge Function (auth + per-user rate limit)
                               │  key from server secret (never in browser)
                               ▼
-                          Gemini 2.5 Flash  ──(if it fails)──▶  Groq Llama-3.3-70B
+                          Gemini 2.5 Flash  ──(if it fails)──▶  Groq openai/gpt-oss-120b
                               │
                               ▼  streamed back
                           Browser renders the draft
 ```
 
-- **`generate-proposal`** — the proposal generator. Streams the draft. Capped at
-  **10 proposals/user/day** (`DAILY_LIMIT` in the function; failed generations
-  are refunded).
+- **`generate-proposal`** — the proposal generator. Streams the draft. Draft credits
+  follow the plan (`TIER_DRAFTS` in the function: Free 2 a month, Starter 15, Pro
+  unlimited; one draft is up to 3 calls) and are spent server-side through
+  `consume_proposal_credit()`, so a user can't reset them. Failed generations are
+  refunded. There is also a burst limit of 15 calls in 10 minutes.
 - **`ai-chat`** — the in-app assistant (bottom-right bubble). Pulls the signed-in
   org's real profile, pipeline, and deadlines (RLS-scoped) so answers are
   grounded, not generic.
@@ -105,5 +107,5 @@ ask Claude to redeploy via the Supabase tools).
 |---|---|
 | "AI provider unavailable" / 502 | `GEMINI_API_KEY` secret not set (or both providers failing) |
 | "Unauthorized" | Not signed in / JWT expired — sign out and back in |
-| "Daily limit reached" | 10/day cap hit; resets at midnight UTC, or raise `DAILY_LIMIT` |
+| "Monthly limit reached" | The plan's draft credits are used; the month resets on the 1st (UTC) |
 | Chatbot says "Please sign in" | Open it from inside the app while signed in |

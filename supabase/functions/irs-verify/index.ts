@@ -7,9 +7,9 @@
 // Body: { ein: string }.  Auth: own check (verify_jwt=false).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsonFor } from '../_shared/cors.ts';
+import { bumpRateLimit, rateLimitMessage } from '../_shared/ratelimit.ts';
 
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 const SUBS: Record<number, string> = {
   3: '501(c)(3) charitable / educational', 4: '501(c)(4) social welfare', 5: '501(c)(5) labor / agricultural',
@@ -18,12 +18,16 @@ const SUBS: Record<number, string> = {
 };
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  const { json, preflight } = jsonFor(req);
+  if (req.method === 'OPTIONS') return preflight();
   const auth = req.headers.get('Authorization');
   if (!auth?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
   const { data: { user }, error: aerr } = await sb.auth.getUser();
   if (aerr || !user) return json({ error: 'Unauthorized' }, 401);
+
+  const rl = await bumpRateLimit('irs-verify', user.id, 30, 3600);
+  if (!rl.allowed) return json({ error: rateLimitMessage('IRS lookups', rl) }, 429);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
@@ -34,12 +38,15 @@ Deno.serve(async (req: Request) => {
   try {
     res = await fetch(`https://projects.propublica.org/nonprofits/api/v2/organizations/${ein}.json`, { headers: { 'User-Agent': 'GrangeAI/1.0 (grant-readiness check)' } });
   } catch (_) { return json({ error: 'The IRS lookup service is unreachable right now. Try again shortly.' }, 502); }
-  if (res.status === 404) return json({ ok: true, output: { found: false, ein } });
+  // Not in the file is NOT "not tax-exempt": the IRS Business Master File lags new determinations by
+  // months, and ProPublica refreshes from it monthly. Say so instead of implying the org has no status.
+  const NOT_FOUND_NOTE = 'This EIN is not in the IRS Exempt Organizations file yet. New organizations usually take several months to appear after their determination letter, and a fiscal sponsor’s EIN is different from yours. If you have a determination letter, you are tax-exempt; upload it under Readiness.';
+  if (res.status === 404) return json({ ok: true, output: { found: false, ein, note: NOT_FOUND_NOTE } });
   if (!res.ok) return json({ error: 'The IRS lookup service is unavailable right now. Try again shortly.' }, 502);
 
   const data = await res.json().catch(() => ({}));
   const o = (data && data.organization) || null;
-  if (!o || o.subsection_code == null) return json({ ok: true, output: { found: false, ein } });
+  if (!o || o.subsection_code == null) return json({ ok: true, output: { found: false, ein, note: NOT_FOUND_NOTE } });
 
   const sub = Number(o.subsection_code);
   const ded = Number(o.deductibility_code);

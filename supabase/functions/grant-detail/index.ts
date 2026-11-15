@@ -6,9 +6,9 @@
 // Auth: own (verify_jwt=false).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsonFor } from '../_shared/cors.ts';
+import { bumpRateLimit, rateLimitMessage } from '../_shared/ratelimit.ts';
 
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 const GOV = 'https://api.grants.gov/v1/api/fetchOpportunity';
 
 // Strip tags + decode the common HTML entities Grants.gov emits (&amp; LAST so we
@@ -51,12 +51,16 @@ async function detail(id: string): Promise<any | null> {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  const { json, preflight } = jsonFor(req);
+  if (req.method === 'OPTIONS') return preflight();
   const auth = req.headers.get('Authorization');
   if (!auth?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
   const { data: { user }, error: aerr } = await sb.auth.getUser();
   if (aerr || !user) return json({ error: 'Unauthorized' }, 401);
+
+  const rl = await bumpRateLimit('grant-detail', user.id, 60, 3600);
+  if (!rl.allowed) return json({ error: rateLimitMessage('grant details', rl) }, 429);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }

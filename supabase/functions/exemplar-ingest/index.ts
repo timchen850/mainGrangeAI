@@ -7,8 +7,8 @@
 // retrieve them as few-shot anchors.
 //
 // ADMIN-GATED: only an allowlisted admin email may ingest (curated corpus).
-// Set EXEMPLAR_ADMIN_EMAILS (comma-separated) in Edge Function secrets to
-// override the default. Embeds each chunk with the key-free 'gte-small' model
+// Set EXEMPLAR_ADMIN_EMAILS (comma-separated) in Edge Function secrets; with
+// it unset the function refuses every call. Embeds each chunk with the key-free 'gte-small' model
 // (384-dim), the same embedder as the rest of the RAG stack.
 //
 // Body: {
@@ -25,9 +25,9 @@
 // }
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsonFor } from '../_shared/cors.ts';
+import { bumpRateLimit, rateLimitMessage } from '../_shared/ratelimit.ts';
 
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 // Same chunker as rag-ingest: overlapping chunks on natural (paragraph) boundaries.
 function chunkText(text: string, size = 1100, overlap = 150): string[] {
@@ -66,16 +66,23 @@ function bandFromAmount(amt: number): string {
 const BANDS = ['<50k', '50-150k', '150-500k', '500k+'];
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  const { json, preflight } = jsonFor(req);
+  if (req.method === 'OPTIONS') return preflight();
   const auth = req.headers.get('Authorization');
   if (!auth?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
   const { data: { user }, error: aerr } = await sb.auth.getUser();
   if (aerr || !user) return json({ error: 'Unauthorized' }, 401);
 
+  const rl = await bumpRateLimit('exemplar-ingest', user.id, 60, 3600);
+  if (!rl.allowed) return json({ error: rateLimitMessage('uploads', rl) }, 429);
+
   // Admin gate — curated shared corpus, only an allowlisted email may write.
-  const admins = (Deno.env.get('EXEMPLAR_ADMIN_EMAILS') || 'tchen8108@gmail.com')
+  // No built-in default: if the secret is unset, nobody can ingest (Nov 2026 review: the old
+  // fallback hard-coded a personal email address into the deployed source).
+  const admins = (Deno.env.get('EXEMPLAR_ADMIN_EMAILS') || '')
     .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (!admins.length) return json({ error: 'Exemplar ingest is not configured (set EXEMPLAR_ADMIN_EMAILS).' }, 503);
   if (!user.email || !admins.includes(user.email.toLowerCase())) {
     return json({ error: 'Forbidden — exemplar ingest is admin-only.' }, 403);
   }

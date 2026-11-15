@@ -35,7 +35,7 @@ export function startServer(port = +process.env.QA_PORT || 3456) {   // QA_PORT:
 }
 
 export async function launch() {
-  return chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+  return chromium.launch({ executablePath: process.env.QA_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
 }
 
 /* ───────── fonts ───────── */

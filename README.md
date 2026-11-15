@@ -18,7 +18,7 @@ anyone reads it. Grange AI walks a first-time applicant through the whole proces
 | Step | What the user gets |
 |---|---|
 | **Profile** | A short survey (or a Form 990 upload) builds one organization profile that every later step reads from. Works for registered nonprofits, fiscal sponsees, businesses, governments and groups that haven't incorporated yet. |
-| **Discover** | Live federal opportunities from Grants.gov, filtered by the organization's type and focus areas, with a 0–100 match score; past federal awards to similar organizations from USASpending.gov; curated funders that don't require nonprofit status. |
+| **Discover** | Live federal opportunities from Grants.gov, filtered by the organization's type and focus areas, with a 0–100 profile-match score (a fixed formula, no AI); past federal awards to similar organizations from USASpending.gov; a short curated list of foundations and funders that don't require nonprofit status. Foundation search as a live source is on the roadmap. An optional, clearly separate AI assessment reads each grant against the profile. |
 | **Prepare** | A readiness checklist (documents funders ask for), an IRS status check, a guided SAM.gov setup, and a step-by-step path for groups that want to become a nonprofit or use a fiscal sponsor. An AI read of a specific funder's call says whether to apply and what it requires. |
 | **Write** | A proposal generator that streams a full draft, grounded in the profile, a library of openly licensed winning proposals, and the user's own past proposals. Facts it couldn't confirm are highlighted for the user to check, and stay marked `[VERIFY: …]` in the Word, PDF and text exports. An editing pass strips generic "AI voice". |
 | **Manage** | Deadlines with staged reminders, and after an award: a compliance checklist and spending tracked against the budget. |
@@ -35,9 +35,9 @@ An in-app assistant answers questions about the current screen, and a guided tou
   publishable key; AI and API keys live in the functions.
 - **Data sources:** Grants.gov Search and Opportunity APIs, USASpending.gov, and ProPublica's Nonprofit
   Explorer (IRS data), all called server-side.
-- **AI:** Google Gemini for drafting, scoring and the assistant. Drafting falls back to Groq
-  (`openai/gpt-oss-120b`) when Gemini is busy; the live drafting function is
-  [`supabase/live/generate-proposal.ts`](supabase/live/generate-proposal.ts). Retrieval uses `gte-small` embeddings in pgvector. [`grantbench/`](grantbench) is a
+- **AI:** Google Gemini for drafting, scoring and the assistant, with Groq (`openai/gpt-oss-120b`) as
+  the fallback in every AI function. Each function spends a per-user quota written server-side
+  (drafts follow the plan: 2 a month on Free, 15 on Starter, unlimited on Pro). Retrieval uses `gte-small` embeddings in pgvector. [`grantbench/`](grantbench) is a
   labeled evaluation suite for the scoring and judging prompts.
 - **Schema:** [`supabase/schema.sql`](supabase/schema.sql) and [`supabase/migrations/`](supabase/migrations).
 - [`app/`](app) and [`mobile/`](mobile) hold an earlier React/Vite build packaged for desktop (Electron)
