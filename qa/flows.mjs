@@ -674,7 +674,7 @@ flow('browser-back-forward', async (browser, check) => {
   check('Back again reaches the dashboard', (await screen(p)) === 'dashboard');
   await p.goForward(); await p.waitForTimeout(800);
   check('Forward works', (await screen(p)) === 'discovery');
-  check('URL unchanged (no stray #)', !p.url().includes('#'));
+  check('the address names the screen (#discovery), so it can be linked and reloaded', p.url().endsWith('#discovery'));   // Nov 15: hash routes
   // a signed-in user can't walk back into the public site
   await p.goBack(); await p.goBack(); await p.waitForTimeout(1000);
   check('signed-in user is never sent back to the landing page', (await screen(p)) === 'dashboard');
@@ -751,7 +751,7 @@ flow('keyboard-and-legal-links', async (browser, check) => {
     const top = await q.evaluate((pg) => document.querySelectorAll('#' + pg + ' .legal-doc h2')[3].getBoundingClientRect().top, page);
     check(page + ': contents link jumps to its section', top > 40 && top < 200);
   }
-  check('no stray # in the URL', !q.url().includes('#'));
+  check('the address names the legal page (#terms)', /#(privacy|terms)$/.test(q.url()));   // Nov 15: hash routes; contents links add no second #
   t.errors.push(...v.errors); await v.ctx.close();
   return t;
 });
@@ -1012,9 +1012,12 @@ flow('plan-change-before-billing', async (browser, check) => {
     ? r.fulfill({ status: 400, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ code: 'PGRST204', message: "Could not find the 'tier' column of 'profiles' in the schema cache", details: null, hint: null }) })
     : r.fallback());
   await p.evaluate(() => go('plan')); await p.waitForTimeout(900);
-  await p.click('#plan button:has-text("Choose Starter")'); await p.waitForTimeout(900);
+  // Nov 15: paid cards read "Coming soon" until Stripe is tested; the browser never writes a paid tier itself
+  check('paid cards say "Coming soon"', (await p.textContent('#pricing-cards .pc:nth-child(2) .pc-cta')).trim() === 'Coming soon');
+  await p.click('#pricing-cards .pc:nth-child(2) .pc-cta'); await p.waitForTimeout(900);
   const msg = await p.textContent('#toast-text');
   check('says paid plans are not open yet (not "try again")', /aren.t open yet/.test(msg) && !/try again/i.test(msg));
+  check('no plan change was sent to the database', !t.restLog.some((l) => /PATCH profiles/.test(l) && /tier/.test(l)));
   t.errors = t.errors.filter((e) => !/400|Bad Request/.test(e));
   return t;
 });
@@ -1381,7 +1384,7 @@ flow('pricing-and-savings', async (browser, check) => {
   const has = (c, f) => p.evaluate(([c, f]) => { const r = [...document.querySelectorAll('#pricing-cards .pc')][c].querySelectorAll('.pf-row'); const row = [...r].find((x) => x.textContent.includes(f)); return row ? !!row.querySelector('.pf-ic.yes') : null; }, [c, f]);
   check('Pro is the featured plan ("Best value")', await p.evaluate(() => { const c = document.querySelectorAll('#pricing-cards .pc')[2]; return c.classList.contains('featured') && /Best value/.test(c.textContent); }));
   check('Starter leaves out what makes Pro worth it (past proposals, grant management)', (await has(1, 'past proposals')) === false && (await has(1, 'Grant management')) === false && (await has(2, 'past proposals')) === true && (await has(2, 'Grant management')) === true);
-  check('Free leaves out export; Starter has it', (await has(0, 'export')) === false && (await has(1, 'export')) === true);
+  check('export is on every plan (the app offers it to Free accounts)', (await has(0, 'export')) === true && (await has(1, 'export')) === true);   // Nov 15
   const all = await p.evaluate(() => document.getElementById('plan').innerText + document.getElementById('pricing').innerText);
   check('no features the app does not have (team roles, account manager, calendar sync, unlimited users)', !/team roles|multi-user|account manager|calendar sync|unlimited users/i.test(all));
   const landing = await p.evaluate(() => document.getElementById('pricing').innerText.replace(/\s+/g, ' '));
